@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style type="text/css">
+.datagrid table { border-collapse: collapse; text-align: left; width: 100%; } .datagrid {font: normal 12px/150% Arial, Helvetica, sans-serif; background: #fff; overflow: hidden; border: 1px solid #A65B1A; color: #000000; -webkit-border-radius: 3px; -moz-border-radius: 3px; border-radius: 3px; }.datagrid table td, .datagrid table th { padding: 3px 10px; }.datagrid table thead th {background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #A65B1A), color-stop(1, #7F4614) );background:-moz-linear-gradient( center top, #A65B1A 5%, #7F4614 100% );filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#A65B1A', endColorstr='#7F4614');background-color:#A65B1A; color:#FFFFFF; font-size: 15px; font-weight: bold; border-left: 1px solid #BF691E; } .datagrid table thead th:first-child { border: none; }.datagrid table tbody td { color: #7F4614; border-left: 1px solid #D9CFB8;font-size: 12px;font-weight: normal; }.datagrid table tbody .alt td { background: #F0E5CC; color: #7F4614; }.datagrid table tbody td:first-child { border-left: none; }.datagrid table tbody tr:last-child td { border-bottom: none; }
+body {
+	background-color:#000000;
+	font: normal 12px/150% Arial, Helvetica, sans-serif;
+	font-size: 15px; font-weight: bold;
+	color: white;
+}
+.wave { background-color:#7F4614;}
+</style>
+</head>
+<body>
+<h2>Crazy Waves</h2>
+<canvas id="myCanvas" width="800" height="600" style="border:1px solid #004000";>
+Your browser does not support the HTML5 canvas tag.
+</canvas>
+
+<script>
+var c = document.getElementById("myCanvas");
+const kSampleRate = 44100; // Other sample rates might not work depending on the your browser's AudioContext
+const kNumSamples = kSampleRate * 2;
+const kFrequency  = 440;
+const kPI_2       = Math.PI * 2;
+const amp         = .2;
+var gain = 0.8;
+
+var notes = [
+{ "note":"C0", "freq":"16.35" },
+{ "note":"C#0/Db", "freq":"017.32" },
+{ "note":"D0", "freq":"18.35" },
+{ "note":"D#0/Eb", "freq":"019.45" },
+{ "note":"E0", "freq":"20.60" },
+{ "note":"F0", "freq":"21.83" },
+{ "note":"F#0/Gb0", "freq":"23.12" },
+{ "note":"G0", "freq":"24.50" },
+{ "note":"G#0/Ab0", "freq":"25.96" },
+{ "note":"A0", "freq":"27.50" },
+{ "note":"A#0/Bb0", "freq":"29.14" },
+{ "note":"B0", "freq":"30.87" },
+{ "note":"C1", "freq":"32.70" },
+{ "note":"C#1/Db1", "freq":"34.65" },
+{ "note":"D1", "freq":"36.71" },
+{ "note":"D#1/Eb1", "freq":"38.89" },
+{ "note":"E1", "freq":"41.20" },
+{ "note":"F1", "freq":"43.65" },
+{ "note":"F#1/Gb1", "freq":"46.25" },
+{ "note":"G1", "freq":"49.00" },
+{ "note":"G#1/Ab1", "freq":"51.91" },
+{ "note":"A1", "freq":"55.00" },
+{ "note":"A#1/Bb1", "freq":"58.27" },
+{ "note":"B1", "freq":"61.74" },
+{ "note":"C2", "freq":"65.41" },
+{ "note":"C#2/Db2", "freq":"69.30" },
+{ "note":"D2", "freq":"73.42" },
+{ "note":"D#2/Eb2", "freq":"77.78" },
+{ "note":"E2", "freq":"82.41" },
+{ "note":"F2", "freq":"87.31" },
+{ "note":"F#2/Gb2", "freq":"92.50" },
+{ "note":"G2", "freq":"98.00" },
+{ "note":"G#2/Ab2", "freq":"103.83" },
+{ "note":"A2", "freq":"110.00" },
+{ "note":"A#2/Bb2", "freq":"116.54" },
+{ "note":"B2", "freq":"123.47" },
+{ "note":"C3", "freq":"130.81" },
+{ "note":"C#3/Db3", "freq":"138.59" },
+{ "note":"D3", "freq":"146.83" },
+{ "note":"D#3/Eb3", "freq":"155.56" },
+{ "note":"E3", "freq":"164.81" },
+{ "note":"F3", "freq":"174.61" },
+{ "note":"F#3/Gb3", "freq":"185.00" },
+{ "note":"G3", "freq":"196.00" },
+{ "note":"G#3/Ab3", "freq":"207.65" },
+{ "note":"A3", "freq":"220.00" },
+{ "note":"A#3/Bb3", "freq":"233.08" },
+{ "note":"B3", "freq":"246.94" },
+{ "note":"C4", "freq":"261.63" },
+{ "note":"C#4/Db4", "freq":"277.18" },
+{ "note":"D4", "freq":"293.66" },
+{ "note":"D#4/Eb4", "freq":"311.13" },
+{ "note":"E4", "freq":"329.63" },
+{ "note":"F4", "freq":"349.23" },
+{ "note":"F#4/Gb4", "freq":"369.99" },
+{ "note":"G4", "freq":"392.00" },
+{ "note":"G#4/Ab4", "freq":"415.30" },
+{ "note":"A4", "freq":"440.00" },
+{ "note":"A#4/Bb4", "freq":"466.16" },
+{ "note":"B4", "freq":"493.88" },
+{ "note":"C5", "freq":"523.25" },
+{ "note":"C#5/Db5", "freq":"554.37" },
+{ "note":"D5", "freq":"587.33" },
+{ "note":"D#5/Eb5", "freq":"622.25" },
+{ "note":"E5", "freq":"659.25" },
+{ "note":"F5", "freq":"698.46" },
+{ "note":"F#5/Gb5", "freq":"739.99" },
+{ "note":"G5", "freq":"783.99" },
+{ "note":"G#5/Ab5", "freq":"830.61" },
+{ "note":"A5", "freq":"880.00" },
+{ "note":"A#5/Bb5", "freq":"932.33" },
+{ "note":"B5", "freq":"987.77" },
+{ "note":"C6", "freq":"1046.50" },
+{ "note":"C#6/Db6", "freq":"1108.73" },
+{ "note":"D6", "freq":"1174.66" },
+{ "note":"D#6/Eb6", "freq":"1244.51" },
+{ "note":"E6", "freq":"1318.51" },
+{ "note":"F6", "freq":"1396.91" },
+{ "note":"F#6/Gb6", "freq":"1479.98" },
+{ "note":"G6", "freq":"1567.98" },
+{ "note":"G#6/Ab6", "freq":"1661.22" },
+{ "note":"A6", "freq":"1760.00" },
+{ "note":"A#6/Bb6", "freq":"1864.66" },
+{ "note":"B61", "freq":"975.53" },
+{ "note":"C7", "freq":"2093.00" },
+{ "note":"C#7/Db7", "freq":"2217.46" },
+{ "note":"D7", "freq":"2349.32" },
+{ "note":"D#7/Eb7", "freq":"2489.02" },
+{ "note":"E7", "freq":"2637.02" },
+{ "note":"F7", "freq":"2793.83" },
+{ "note":"F#7/Gb7", "freq":"2959.96" },
+{ "note":"G7", "freq":"3135.96" },
+{ "note":"G#7/Ab7", "freq":"3322.44" },
+{ "note":"A7", "freq":"3520.00" },
+{ "note":"A#7/Bb7", "freq":"3729.31" },
+{ "note":"B73", "freq":"951.07" },
+{ "note":"C8", "freq":"4186.01" },
+{ "note":"C#8/Db8", "freq":"4434.92" },
+{ "note":"D8", "freq":"4698.63" },
+{ "note":"D#8/Eb8", "freq":"4978.03" },
+{ "note":"E8", "freq":"5274.04" },
+{ "note":"F8", "freq":"5587.65" },
+{ "note":"F#8/Gb8", "freq":"5919.91" },
+{ "note":"G8", "freq":"6271.93" },
+{ "note":"G#8/Ab8", "freq":"6644.88" },
+{ "note":"A8", "freq":"7040.00" },
+{ "note":"A#8/Bb8", "freq":"7458.62" },
+{ "note":"B8", "freq":"7902.13" }
+];
+
+function addSine(buf, freq, amp, add, include){
+	if (!include) return;
+	for (i = 0; i < kNumSamples; ++i) {
+		var val = Math.sin(freq * kPI_2 * i / kSampleRate);
+		if (add){
+		    buf[i] = buf[i] + (val * amp * gain);
+		} else {
+		    buf[i] = val * amp * gain;
+		}
+	}
+}
+
+function wave(id,freq, amp, enabled){
+	this.id = id;
+    this.freq = freq;
+    this.amp = amp;
+    this.enabled = enabled;
+}
+
+function addSines(buf, waves){
+	for (var i = 0; i < waves.length; i++) {
+	    addSine(buf, waves[i].freq, waves[i].amp, (i < waves.length), waves[i].enabled);
+	}
+}
+
+
+function draw(wave){
+	var ctx = c.getContext("2d");
+
+	c.width = c.width;
+
+	for (var x = 0.5; x < 800; x += 10) {
+	  ctx.moveTo(x, 0);
+	  ctx.lineTo(x, 600);
+	}
+
+	for (var y = 0.5; y < 600; y += 10) {
+	  ctx.moveTo(0, y);
+	  ctx.lineTo(800, y);
+	}
+
+	ctx.strokeStyle = "#004000";
+	ctx.stroke();
+
+	ctx.beginPath();
+	ctx.moveTo(0,300.5);
+	ctx.lineTo(800,300.5);
+
+	ctx.strokeStyle = "#007700";
+	ctx.stroke();
+
+	if (wave)
+	{
+		ctx.beginPath();
+		ctx.moveTo(0,299.5);
+		ctx.strokeStyle = "#00FF00";
+		for (i = 0; i < 800; ++i) {
+			ctx.lineTo(i, (buf[i] * -300) + 300);
+		}
+
+		ctx.stroke();
+	}
+}
+
+
+
+</script>
+
+<script>
+
+window.AudioContext = window.webkitAudioContext;
+
+var aud = new AudioContext();
+var buffer = aud.createBuffer(1, kNumSamples, kSampleRate);
+var buf  = buffer.getChannelData(0);
+var waves = new Array();
+
+draw(false);
+
+function play(){
+	var node = aud.createBufferSource(0);
+	node.buffer = buffer;
+	node.connect(aud.destination);
+	node.noteOn(aud.currentTime);
+}
+
+function toggleWave(id){
+	console.log(id);
+	for (var i = 0; i < waves.length; i++) {
+		if (waves[i].id == id){
+			waves[i].enabled = !waves[i].enabled;
+		}
+	}
+	for (i = 0; i < kNumSamples; ++i) {
+	buf[i] = 0.0;
+	}
+	addSines(buf, waves);
+	draw(true);
+	
+}
+
+function addWave(){
+	for (i = 0; i < kNumSamples; ++i) {
+		buf[i] = 0.0;
+	}
+	var freq = document.getElementById("freq").value;
+	var amp = document.getElementById("amp_slider").value / 100;
+	var id = new Date().getTime();
+	waves.push(new wave(id,freq,amp,true));
+	addSines(buf, waves);
+	draw(true);
+	var table = document.getElementById("wave_table");
+	var row = table.insertRow(-1);
+	var cell1 = row.insertCell(0);
+	var cell2 = row.insertCell(1);
+	var cell3 = row.insertCell(2);
+	cell1.innerHTML = freq;
+	cell2.innerHTML = amp * 100;
+	cell3.innerHTML = "Y";
+	cell3.addEventListener("click", function() {
+		this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
+		toggleWave(id);
+		});
+}
+
+function clearShit(){
+	for (i = 0; i < kNumSamples; ++i) {
+		buf[i] = 0.0;
+	}
+	waves = new Array();
+	draw(false);
+	var table = document.getElementById("wave_table");
+	var rows = table.rows.length;
+	for(var i = rows - 1; i > 0; i--)
+	{
+		table.deleteRow(i);
+	}
+}
+
+
+function selectNote(sel){
+	var freq = document.getElementById("freq");
+	if (sel.value != -1)
+		freq.value = sel.value;
+}
+
+function setGain(slider){
+	document.getElementById("gain").value = slider.value;
+	gain = slider.value / 100;
+	for (i = 0; i < kNumSamples; ++i) {
+		buf[i] = 0.0;
+	}
+	addSines(buf, waves);
+	draw(true);		
+}
+
+function addWaves(add){
+	if (add) {
+		for (i = 0; i < kNumSamples; ++i) {
+			buf[i] = 0.0;
+		}
+		addSines(buf, waves);
+		draw(true);
+	}
+}
+
+function updateFreqFromDD(id){
+	var freq = document.getElementById(id + '_freq');
+	var dd = document.getElementById(id + '_note');
+
+	var wav;
+	for (var i = 0; i < waves.length; i++) {
+		if (waves[i].id == id){
+			waves[i].freq = dd.value;
+			wav = waves[i];
+		}
+	}
+
+	freq.value = dd.value;
+	addWaves(wav.enabled);
+}
+
+function updateFreq(id){
+	var freq = document.getElementById(id + '_freq');
+	var dd = document.getElementById(id + '_note');
+	dd.options.selectedIndex = 0;
+	var wav;
+	for (var i = 0; i < waves.length; i++) {
+		if (waves[i].id == id){
+			waves[i].freq = freq.value;
+			wav = waves[i];
+		}
+	}
+	
+	addWaves(wav.enabled);
+}
+
+function updateAmp(id){
+	var amp = document.getElementById(id + '_amp');
+
+	var wav;
+	for (var i = 0; i < waves.length; i++) {
+		if (waves[i].id == id){
+			waves[i].amp = amp.value /100;
+			wav = waves[i];
+		}
+	}
+	
+	addWaves(wav.enabled);
+}
+
+
+function addRow(){
+	var id = new Date().getTime();
+	waves.push(new wave(id,kFrequency,.2,false));
+		var table = document.getElementById("wave_table");
+		var row = table.insertRow(-1);
+		var cell1 = row.insertCell(0);
+		var cell2 = row.insertCell(1);
+		var cell3 = row.insertCell(2);
+		var cell4 = row.insertCell(3);
+		cell1.innerHTML = '<input type="text" id="' + id + '_freq" value="' + kFrequency +'" onchange="updateFreq(' + id + ')">';
+		cell2.innerHTML = '<input type="text" id="' + id + '_amp" value="50" onchange="updateAmp(' + id + ')">';
+		cell4.innerHTML = "N";
+		var dd = '<select name="notes" id="' + id + '_note" onchange="updateFreqFromDD(' + id + ')"><option value=-1>None</option>';
+		for (var i = 0; i < notes.length; i++) {
+			var fr = notes[i].freq;
+			var name = notes[i].note;
+			dd += '<option value=' + fr + '>' + name + '</option>';
+		}
+		dd += '</select>';
+		cell3.innerHTML = dd;
+		cell4.addEventListener("click", function() {
+			this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
+			toggleWave(id);
+			});
+}
+
+</script>
+
+<div id="controls" class="wave">
+	Gain<input name="gain_slider" type="range" min="1" max="200" value="80" id="gain_slider" onChange="document.getElementById('gain').value=this.value;" onMouseUp="setGain(this)" class="range">
+	<input name="gain" id="gain" value="80" readonly="true" style="width:25px">
+	<button onclick="play()">Play</button>
+	<button onclick="clearShit()">Clear</button>
+</div>
+<br/>
+<div class="datagrid" style="width:50%">
+	<table id="wave_table" border=1>
+		<thead>
+		<tr>
+			<th>Frequency Hz</th>
+			<th>Amplitude</th>
+			<th>Note</th>
+			<th>Enabled</th>
+		</tr>
+		</thead>
+		<tbody>
+		</tbody>
+	</table>
+</div>
+<button onclick="addRow()">Add Wave</button>
+</body>
+</html>
