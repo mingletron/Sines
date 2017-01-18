@@ -26,6 +26,7 @@ const kFrequency  = 440;
 const kPI_2       = Math.PI * 2;
 const amp         = .2;
 var gain = 0.8;
+var ctx = c.getContext("2d");
 
 var notes = [
 { "note":"C0", "freq":"16.35" },
@@ -165,8 +166,9 @@ function addSines(buf, waves){
 
 
 function draw(wave){
-	var ctx = c.getContext("2d");
-
+	
+ctx.strokeStyle = "#004000";
+	ctx.stroke();
 	c.width = c.width;
 
 	for (var x = 0.5; x < 800; x += 10) {
@@ -197,7 +199,6 @@ function draw(wave){
 		for (i = 0; i < 800; ++i) {
 			ctx.lineTo(i, (buf[i] * -300) + 300);
 		}
-
 		ctx.stroke();
 	}
 }
@@ -209,12 +210,8 @@ function draw(wave){
 <script>
 
 var ua = navigator.userAgent.toLowerCase(); 
-if (ua.indexOf('safari') != -1) { 
-  if (ua.indexOf('chrome') > -1) {
-    window.AudioContext = window.AudioContext;
-  } else {
-    window.AudioContext = window.webkitAudioContext;
-  }
+if (ua.indexOf('safari') > -1 && ua.indexOf('chrome') == -1 ) {
+	window.AudioContext = window.webkitAudioContext;
 }
 
 
@@ -233,7 +230,6 @@ function play(){
 }
 
 function toggleWave(id){
-	console.log(id);
 	for (var i = 0; i < waves.length; i++) {
 		if (waves[i].id == id){
 			waves[i].enabled = !waves[i].enabled;
