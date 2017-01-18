@@ -208,7 +208,15 @@ function draw(wave){
 
 <script>
 
-window.AudioContext = window.webkitAudioContext;
+var ua = navigator.userAgent.toLowerCase(); 
+if (ua.indexOf('safari') != -1) { 
+  if (ua.indexOf('chrome') > -1) {
+    window.AudioContext = window.AudioContext;
+  } else {
+    window.AudioContext = window.webkitAudioContext;
+  }
+}
+
 
 var aud = new AudioContext();
 var buffer = aud.createBuffer(1, kNumSamples, kSampleRate);
@@ -221,7 +229,7 @@ function play(){
 	var node = aud.createBufferSource(0);
 	node.buffer = buffer;
 	node.connect(aud.destination);
-	node.noteOn(aud.currentTime);
+	node.start(0);
 }
 
 function toggleWave(id){
@@ -263,7 +271,7 @@ function addWave(){
 		});
 }
 
-function clearShit(){
+function clearWaveforms(){
 	for (i = 0; i < kNumSamples; ++i) {
 		buf[i] = 0.0;
 	}
@@ -382,7 +390,7 @@ function addRow(){
 	Gain<input name="gain_slider" type="range" min="1" max="200" value="80" id="gain_slider" onChange="document.getElementById('gain').value=this.value;" onMouseUp="setGain(this)" class="range">
 	<input name="gain" id="gain" value="80" readonly="true" style="width:25px">
 	<button onclick="play()">Play</button>
-	<button onclick="clearShit()">Clear</button>
+	<button onclick="clearWaveforms()">Clear</button>
 </div>
 <br/>
 <div class="datagrid" style="width:50%">
