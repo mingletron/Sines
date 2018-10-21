@@ -1,13 +1,14 @@
+
 <!DOCTYPE html>
 <html>
 <head>
 <style type="text/css">
 .datagrid table { border-collapse: collapse; text-align: left; width: 100%; } .datagrid {font: normal 12px/150% Arial, Helvetica, sans-serif; background: #fff; overflow: hidden; border: 1px solid #A65B1A; color: #000000; -webkit-border-radius: 3px; -moz-border-radius: 3px; border-radius: 3px; }.datagrid table td, .datagrid table th { padding: 3px 10px; }.datagrid table thead th {background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #A65B1A), color-stop(1, #7F4614) );background:-moz-linear-gradient( center top, #A65B1A 5%, #7F4614 100% );filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#A65B1A', endColorstr='#7F4614');background-color:#A65B1A; color:#FFFFFF; font-size: 15px; font-weight: bold; border-left: 1px solid #BF691E; } .datagrid table thead th:first-child { border: none; }.datagrid table tbody td { color: #7F4614; border-left: 1px solid #D9CFB8;font-size: 12px;font-weight: normal; }.datagrid table tbody .alt td { background: #F0E5CC; color: #7F4614; }.datagrid table tbody td:first-child { border-left: none; }.datagrid table tbody tr:last-child td { border-bottom: none; }
 body {
-	background-color:#000000;
-	font: normal 12px/150% Arial, Helvetica, sans-serif;
-	font-size: 15px; font-weight: bold;
-	color: white;
+    background-color:#000000;
+    font: normal 12px/150% Arial, Helvetica, sans-serif;
+    font-size: 15px; font-weight: bold;
+    color: white;
 }
 .wave { background-color:#7F4614;}
 </style>
@@ -139,68 +140,69 @@ var notes = [
 { "note":"B8", "freq":"7902.13" }
 ];
 
-function addSine(buf, freq, amp, add, include){
-	if (!include) return;
-	for (i = 0; i < kNumSamples; ++i) {
-		var val = Math.sin(freq * kPI_2 * i / kSampleRate);
-		if (add){
-		    buf[i] = buf[i] + (val * amp * gain);
-		} else {
-		    buf[i] = val * amp * gain;
-		}
-	}
+function addSine(buf, freq, amp, phase, add, include){
+    if (!include) return;
+    for (i = 0; i < kNumSamples; ++i) {
+        var val = Math.sin(freq * kPI_2 * i / kSampleRate + phase);
+        if (add){
+            buf[i] = buf[i] + (val * amp * gain);
+        } else {
+            buf[i] = val * amp * gain;
+        }
+    }
 }
 
-function wave(id,freq, amp, enabled){
-	this.id = id;
+function wave(id,freq, amp, phase, enabled){
+    this.id = id;
     this.freq = freq;
     this.amp = amp;
+    this.phase = phase;
     this.enabled = enabled;
 }
 
 function addSines(buf, waves){
-	for (var i = 0; i < waves.length; i++) {
-	    addSine(buf, waves[i].freq, waves[i].amp, (i < waves.length), waves[i].enabled);
-	}
+    for (var i = 0; i < waves.length; i++) {
+        addSine(buf, waves[i].freq, waves[i].amp, waves[i].phase, (i < waves.length), waves[i].enabled);
+    }
 }
 
 
 function draw(wave){
-	
+    
 ctx.strokeStyle = "#004000";
-	ctx.stroke();
-	c.width = c.width;
+    ctx.stroke();
+    c.width = c.width;
 
-	for (var x = 0.5; x < 800; x += 10) {
-	  ctx.moveTo(x, 0);
-	  ctx.lineTo(x, 600);
-	}
+    for (var x = 0.5; x < 800; x += 10) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 600);
+    }
 
-	for (var y = 0.5; y < 600; y += 10) {
-	  ctx.moveTo(0, y);
-	  ctx.lineTo(800, y);
-	}
+    for (var y = 0.5; y < 600; y += 10) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(800, y);
+    }
 
-	ctx.strokeStyle = "#004000";
-	ctx.stroke();
+    ctx.strokeStyle = "#004000";
+    ctx.stroke();
 
-	ctx.beginPath();
-	ctx.moveTo(0,300.5);
-	ctx.lineTo(800,300.5);
+    ctx.beginPath();
+    ctx.moveTo(0,300.5);
+    ctx.lineTo(800,300.5);
 
-	ctx.strokeStyle = "#007700";
-	ctx.stroke();
+    ctx.strokeStyle = "#007700";
+    ctx.stroke();
 
-	if (wave)
-	{
-		ctx.beginPath();
-		ctx.moveTo(0,299.5);
-		ctx.strokeStyle = "#00FF00";
-		for (i = 0; i < 800; ++i) {
-			ctx.lineTo(i, (buf[i] * -300) + 300);
-		}
-		ctx.stroke();
-	}
+    if (wave)
+    {
+        ctx.beginPath();
+        ctx.moveTo(0,299.5);
+        ctx.strokeStyle = "#00FF00";
+        for (i = 0; i < 800; ++i) {
+            ctx.lineTo(i, (buf[i] * -300) + 300);
+        }
+        ctx.stroke();
+    }
 }
 
 
@@ -211,7 +213,7 @@ ctx.strokeStyle = "#004000";
 
 var ua = navigator.userAgent.toLowerCase(); 
 if (ua.indexOf('safari') > -1 && ua.indexOf('chrome') == -1 ) {
-	window.AudioContext = window.webkitAudioContext;
+    window.AudioContext = window.webkitAudioContext;
 }
 
 
@@ -223,186 +225,209 @@ var waves = new Array();
 draw(false);
 
 function play(){
-	var node = aud.createBufferSource(0);
-	node.buffer = buffer;
-	node.connect(aud.destination);
-	node.start(0);
+    var node = aud.createBufferSource(0);
+    node.buffer = buffer;
+    node.connect(aud.destination);
+    node.start(0);
 }
 
 function toggleWave(id){
-	for (var i = 0; i < waves.length; i++) {
-		if (waves[i].id == id){
-			waves[i].enabled = !waves[i].enabled;
-		}
-	}
-	for (i = 0; i < kNumSamples; ++i) {
-	buf[i] = 0.0;
-	}
-	addSines(buf, waves);
-	draw(true);
-	
+    for (var i = 0; i < waves.length; i++) {
+        if (waves[i].id == id){
+            waves[i].enabled = !waves[i].enabled;
+        }
+    }
+    for (i = 0; i < kNumSamples; ++i) {
+    buf[i] = 0.0;
+    }
+    addSines(buf, waves);
+    draw(true);
+    
 }
 
 function addWave(){
-	for (i = 0; i < kNumSamples; ++i) {
-		buf[i] = 0.0;
-	}
-	var freq = document.getElementById("freq").value;
-	var amp = document.getElementById("amp_slider").value / 100;
-	var id = new Date().getTime();
-	waves.push(new wave(id,freq,amp,true));
-	addSines(buf, waves);
-	draw(true);
-	var table = document.getElementById("wave_table");
-	var row = table.insertRow(-1);
-	var cell1 = row.insertCell(0);
-	var cell2 = row.insertCell(1);
-	var cell3 = row.insertCell(2);
-	cell1.innerHTML = freq;
-	cell2.innerHTML = amp * 100;
-	cell3.innerHTML = "Y";
-	cell3.addEventListener("click", function() {
-		this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
-		toggleWave(id);
-		});
+    for (i = 0; i < kNumSamples; ++i) {
+        buf[i] = 0.0;
+    }
+    var freq = document.getElementById("freq").value;
+    var amp = document.getElementById("amp_slider").value / 100;
+    var phase = 1;
+    var id = new Date().getTime();
+    waves.push(new wave(id,freq,amp,phase,true));
+    addSines(buf, waves);
+    draw(true);
+    var table = document.getElementById("wave_table");
+    var row = table.insertRow(-1);
+    var cell1 = row.insertCell(0);
+    var cell2 = row.insertCell(1);
+    var cell3 = row.insertCell(2);
+    cell1.innerHTML = freq;
+    cell2.innerHTML = amp * 100;
+    cell3.innerHTML = "Y";
+    cell3.addEventListener("click", function() {
+        this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
+        toggleWave(id);
+        });
 }
 
 function clearWaveforms(){
-	for (i = 0; i < kNumSamples; ++i) {
-		buf[i] = 0.0;
-	}
-	waves = new Array();
-	draw(false);
-	var table = document.getElementById("wave_table");
-	var rows = table.rows.length;
-	for(var i = rows - 1; i > 0; i--)
-	{
-		table.deleteRow(i);
-	}
+    for (i = 0; i < kNumSamples; ++i) {
+        buf[i] = 0.0;
+    }
+    waves = new Array();
+    draw(false);
+    var table = document.getElementById("wave_table");
+    var rows = table.rows.length;
+    for(var i = rows - 1; i > 0; i--)
+    {
+        table.deleteRow(i);
+    }
 }
 
 
 function selectNote(sel){
-	var freq = document.getElementById("freq");
-	if (sel.value != -1)
-		freq.value = sel.value;
+    var freq = document.getElementById("freq");
+    if (sel.value != -1)
+        freq.value = sel.value;
 }
 
 function setGain(slider){
-	document.getElementById("gain").value = slider.value;
-	gain = slider.value / 100;
-	for (i = 0; i < kNumSamples; ++i) {
-		buf[i] = 0.0;
-	}
-	addSines(buf, waves);
-	draw(true);		
+    document.getElementById("gain").value = slider.value;
+    gain = slider.value / 100;
+    for (i = 0; i < kNumSamples; ++i) {
+        buf[i] = 0.0;
+    }
+    addSines(buf, waves);
+    draw(true);        
 }
 
 function addWaves(add){
-	if (add) {
-		for (i = 0; i < kNumSamples; ++i) {
-			buf[i] = 0.0;
-		}
-		addSines(buf, waves);
-		draw(true);
-	}
+    if (add) {
+        for (i = 0; i < kNumSamples; ++i) {
+            buf[i] = 0.0;
+        }
+        addSines(buf, waves);
+        draw(true);
+    }
 }
 
 function updateFreqFromDD(id){
-	var freq = document.getElementById(id + '_freq');
-	var dd = document.getElementById(id + '_note');
+    var freq = document.getElementById(id + '_freq');
+    var dd = document.getElementById(id + '_note');
 
-	var wav;
-	for (var i = 0; i < waves.length; i++) {
-		if (waves[i].id == id){
-			waves[i].freq = dd.value;
-			wav = waves[i];
-		}
-	}
+    var wav;
+    for (var i = 0; i < waves.length; i++) {
+        if (waves[i].id == id){
+            waves[i].freq = dd.value;
+            wav = waves[i];
+        }
+    }
 
-	freq.value = dd.value;
-	addWaves(wav.enabled);
+    freq.value = dd.value;
+    addWaves(wav.enabled);
 }
 
 function updateFreq(id){
-	var freq = document.getElementById(id + '_freq');
-	var dd = document.getElementById(id + '_note');
-	dd.options.selectedIndex = 0;
-	var wav;
-	for (var i = 0; i < waves.length; i++) {
-		if (waves[i].id == id){
-			waves[i].freq = freq.value;
-			wav = waves[i];
-		}
-	}
-	
-	addWaves(wav.enabled);
+    var freq = document.getElementById(id + '_freq');
+    var dd = document.getElementById(id + '_note');
+    dd.options.selectedIndex = 0;
+    var wav;
+    for (var i = 0; i < waves.length; i++) {
+        if (waves[i].id == id){
+            waves[i].freq = freq.value;
+            wav = waves[i];
+        }
+    }
+    
+    addWaves(wav.enabled);
 }
 
-function updateAmp(id){
-	var amp = document.getElementById(id + '_amp');
+function updateAmp(slider){
+    
+    var id = slider.id.substring(4);
+    var amplitude = slider.value / 100;
 
-	var wav;
-	for (var i = 0; i < waves.length; i++) {
-		if (waves[i].id == id){
-			waves[i].amp = amp.value /100;
-			wav = waves[i];
-		}
-	}
-	
-	addWaves(wav.enabled);
+    var wav;
+    for (var i = 0; i < waves.length; i++) {
+        if (waves[i].id == id){
+            waves[i].amp = amplitude;
+            wav = waves[i];
+        }
+    }
+    
+    addWaves(wav.enabled);
 }
 
+function updatePhase(slider){
+    
+    var id = slider.id.substring(6);
+    var phase = slider.value / 100;
+
+    var wav;
+    for (var i = 0; i < waves.length; i++) {
+        if (waves[i].id == id){
+            waves[i].phase = phase;
+            wav = waves[i];
+        }
+    }
+    
+    addWaves(wav.enabled);
+}
 
 function addRow(){
-	var id = new Date().getTime();
-	waves.push(new wave(id,kFrequency,.2,false));
-		var table = document.getElementById("wave_table");
-		var row = table.insertRow(-1);
-		var cell1 = row.insertCell(0);
-		var cell2 = row.insertCell(1);
-		var cell3 = row.insertCell(2);
-		var cell4 = row.insertCell(3);
-		cell1.innerHTML = '<input type="text" id="' + id + '_freq" value="' + kFrequency +'" onchange="updateFreq(' + id + ')">';
-		cell2.innerHTML = '<input type="text" id="' + id + '_amp" value="50" onchange="updateAmp(' + id + ')">';
-		cell4.innerHTML = "N";
-		var dd = '<select name="notes" id="' + id + '_note" onchange="updateFreqFromDD(' + id + ')"><option value=-1>None</option>';
-		for (var i = 0; i < notes.length; i++) {
-			var fr = notes[i].freq;
-			var name = notes[i].note;
-			dd += '<option value=' + fr + '>' + name + '</option>';
-		}
-		dd += '</select>';
-		cell3.innerHTML = dd;
-		cell4.addEventListener("click", function() {
-			this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
-			toggleWave(id);
-			});
+    var id = new Date().getTime();
+    waves.push(new wave(id,kFrequency,.2,1,false));
+        var table = document.getElementById("wave_table");
+        var row = table.insertRow(-1);
+        var cell1 = row.insertCell(0);
+        var cell2 = row.insertCell(1);
+        var cell3 = row.insertCell(2);
+        var cell4 = row.insertCell(3);
+        var cell5 = row.insertCell(4);
+
+        cell1.innerHTML = '<input type="text" id="' + id + '_freq" value="' + kFrequency +'" onchange="updateFreq(' + id + ')">';
+        cell2.innerHTML = '<input type="range" min="1" max="100" id="amp_' + id + '" value="50" onChange="document.getElementById(" + id " + ").value=this.value;" onMouseUp="updateAmp(this)" onTouchEnd="updateAmp(this)" class="range">'
+        cell3.innerHTML = '<input type="range" min="0" max="360" id="phase_' + id + '" value="0" onChange="document.getElementById(" + id " + ").value=this.value;" onMouseUp="updatePhase(this)" onTouchEnd="updatePhase(this)" class="range">'
+        cell5.innerHTML = "N";
+        var dd = '<select name="notes" id="' + id + '_note" onchange="updateFreqFromDD(' + id + ')"><option value=-1>None</option>';
+        for (var i = 0; i < notes.length; i++) {
+            var fr = notes[i].freq;
+            var name = notes[i].note;
+            dd += '<option value=' + fr + '>' + name + '</option>';
+        }
+        dd += '</select>';
+        cell4.innerHTML = dd;
+        cell5.addEventListener("click", function() {
+            this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
+            toggleWave(id);
+            });
 }
 
 </script>
 
 <div id="controls" class="wave">
-	Gain<input name="gain_slider" type="range" min="1" max="200" value="80" id="gain_slider" onChange="document.getElementById('gain').value=this.value;" onMouseUp="setGain(this)" class="range">
-	<input name="gain" id="gain" value="80" readonly="true" style="width:25px">
-	<button onclick="play()">Play</button>
-	<button onclick="clearWaveforms()">Clear</button>
+    Gain<input name="gain_slider" type="range" min="1" max="200" value="80" id="gain_slider" onChange="document.getElementById('gain').value=this.value;" onMouseUp="setGain(this)" onTouchEnd="setGain(this)" class="range">
+    <input name="gain" id="gain" value="80" readonly="true" style="width:25px">
+    <button onclick="play()">Play</button>
+    <button onclick="clearWaveforms()">Clear</button>
 </div>
 <br/>
 <div class="datagrid" style="width:50%">
-	<table id="wave_table" border=1>
-		<thead>
-		<tr>
-			<th>Frequency Hz</th>
-			<th>Amplitude</th>
-			<th>Note</th>
-			<th>Enabled</th>
-		</tr>
-		</thead>
-		<tbody>
-		</tbody>
-	</table>
+    <table id="wave_table" border=1>
+        <thead>
+        <tr>
+            <th>Frequency Hz</th>
+            <th>Amplitude</th>
+            <th>Phase</th>
+            <th>Note</th>
+            <th>Enabled</th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
 </div>
 <button onclick="addRow()">Add Wave</button>
 </body>
 </html>
+
