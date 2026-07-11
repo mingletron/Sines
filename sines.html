@@ -195,174 +195,249 @@ Your browser does not support the HTML5 canvas tag.
 </canvas>
 </div>
 
+<div id="controls" class="panel controls">
+    <div class="control">
+        <label for="gainSlider">Gain</label>
+        <input name="gain_slider" type="range" min="1" max="200" value="80" id="gainSlider">
+        <span class="readout" id="gainReadout">80</span>
+    </div>
+    <div class="control">
+        <label for="zoomSlider">Zoom</label>
+        <input name="zoom_slider" type="range" min="20" max="800" value="100" id="zoomSlider">
+        <span class="readout" id="zoomReadout">1.00x</span>
+    </div>
+    <div class="control">
+        <label for="loopToggle">Loop</label>
+        <input type="checkbox" id="loopToggle">
+    </div>
+    <div class="spacer"></div>
+    <button type="button" id="playBtn">▶ Play</button>
+    <button type="button" class="secondary small" id="stopBtn">■ Stop</button>
+    <button type="button" class="secondary small" id="clearBtn">Clear</button>
+</div>
+
+<div class="panel presets">
+    <span class="label">Presets</span>
+    <button type="button" class="secondary small preset-btn" data-preset="sine">Sine</button>
+    <button type="button" class="secondary small preset-btn" data-preset="saw">Sawtooth</button>
+    <button type="button" class="secondary small preset-btn" data-preset="square">Square</button>
+    <button type="button" class="secondary small preset-btn" data-preset="triangle">Triangle</button>
+</div>
+
+<div class="panel">
+    <table id="waveTable">
+        <thead>
+        <tr>
+            <th>Frequency Hz</th>
+            <th>Amplitude</th>
+            <th>Phase (°)</th>
+            <th>Note</th>
+            <th>Enabled</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <button type="button" class="secondary add-row" id="addWaveBtn">+ Add Wave</button>
+</div>
+</div>
+
 <script>
-const c = document.getElementById("myCanvas");
+// ============================================================
+// Constants
+// ============================================================
 const kSampleRate = 44100;
 const kNumSamples = kSampleRate * 2;
 const kFrequency  = 440;
 const kPI_2       = Math.PI * 2;
-const amp         = 0.2;
-let gain = 0.8;
-let zoom = 1;
-const ctx = c.getContext("2d");
-
-let persistFrames = [];
 const MAX_PERSIST = 4;
 
-function getSampleRate() {
-    return (typeof aud !== 'undefined' && aud && aud.sampleRate) ? aud.sampleRate : kSampleRate;
-}
-
+// ============================================================
+// Note frequency table (87-tone piano from C0 to B8)
+// ============================================================
 const notes = [
-{ "note":"C0", "freq":"16.35" },
-{ "note":"C#0/Db", "freq":"17.32" },
-{ "note":"D0", "freq":"18.35" },
-{ "note":"D#0/Eb", "freq":"19.45" },
-{ "note":"E0", "freq":"20.60" },
-{ "note":"F0", "freq":"21.83" },
-{ "note":"F#0/Gb0", "freq":"23.12" },
-{ "note":"G0", "freq":"24.50" },
-{ "note":"G#0/Ab0", "freq":"25.96" },
-{ "note":"A0", "freq":"27.50" },
-{ "note":"A#0/Bb0", "freq":"29.14" },
-{ "note":"B0", "freq":"30.87" },
-{ "note":"C1", "freq":"32.70" },
-{ "note":"C#1/Db1", "freq":"34.65" },
-{ "note":"D1", "freq":"36.71" },
-{ "note":"D#1/Eb1", "freq":"38.89" },
-{ "note":"E1", "freq":"41.20" },
-{ "note":"F1", "freq":"43.65" },
-{ "note":"F#1/Gb1", "freq":"46.25" },
-{ "note":"G1", "freq":"49.00" },
-{ "note":"G#1/Ab1", "freq":"51.91" },
-{ "note":"A1", "freq":"55.00" },
-{ "note":"A#1/Bb1", "freq":"58.27" },
-{ "note":"B1", "freq":"61.74" },
-{ "note":"C2", "freq":"65.41" },
-{ "note":"C#2/Db2", "freq":"69.30" },
-{ "note":"D2", "freq":"73.42" },
-{ "note":"D#2/Eb2", "freq":"77.78" },
-{ "note":"E2", "freq":"82.41" },
-{ "note":"F2", "freq":"87.31" },
-{ "note":"F#2/Gb2", "freq":"92.50" },
-{ "note":"G2", "freq":"98.00" },
-{ "note":"G#2/Ab2", "freq":"103.83" },
-{ "note":"A2", "freq":"110.00" },
-{ "note":"A#2/Bb2", "freq":"116.54" },
-{ "note":"B2", "freq":"123.47" },
-{ "note":"C3", "freq":"130.81" },
-{ "note":"C#3/Db3", "freq":"138.59" },
-{ "note":"D3", "freq":"146.83" },
-{ "note":"D#3/Eb3", "freq":"155.56" },
-{ "note":"E3", "freq":"164.81" },
-{ "note":"F3", "freq":"174.61" },
-{ "note":"F#3/Gb3", "freq":"185.00" },
-{ "note":"G3", "freq":"196.00" },
-{ "note":"G#3/Ab3", "freq":"207.65" },
-{ "note":"A3", "freq":"220.00" },
-{ "note":"A#3/Bb3", "freq":"233.08" },
-{ "note":"B3", "freq":"246.94" },
-{ "note":"C4", "freq":"261.63" },
-{ "note":"C#4/Db4", "freq":"277.18" },
-{ "note":"D4", "freq":"293.66" },
-{ "note":"D#4/Eb4", "freq":"311.13" },
-{ "note":"E4", "freq":"329.63" },
-{ "note":"F4", "freq":"349.23" },
-{ "note":"F#4/Gb4", "freq":"369.99" },
-{ "note":"G4", "freq":"392.00" },
-{ "note":"G#4/Ab4", "freq":"415.30" },
-{ "note":"A4", "freq":"440.00" },
-{ "note":"A#4/Bb4", "freq":"466.16" },
-{ "note":"B4", "freq":"493.88" },
-{ "note":"C5", "freq":"523.25" },
-{ "note":"C#5/Db5", "freq":"554.37" },
-{ "note":"D5", "freq":"587.33" },
-{ "note":"D#5/Eb5", "freq":"622.25" },
-{ "note":"E5", "freq":"659.25" },
-{ "note":"F5", "freq":"698.46" },
-{ "note":"F#5/Gb5", "freq":"739.99" },
-{ "note":"G5", "freq":"783.99" },
-{ "note":"G#5/Ab5", "freq":"830.61" },
-{ "note":"A5", "freq":"880.00" },
-{ "note":"A#5/Bb5", "freq":"932.33" },
-{ "note":"B5", "freq":"987.77" },
-{ "note":"C6", "freq":"1046.50" },
-{ "note":"C#6/Db6", "freq":"1108.73" },
-{ "note":"D6", "freq":"1174.66" },
-{ "note":"D#6/Eb6", "freq":"1244.51" },
-{ "note":"E6", "freq":"1318.51" },
-{ "note":"F6", "freq":"1396.91" },
-{ "note":"F#6/Gb6", "freq":"1479.98" },
-{ "note":"G6", "freq":"1567.98" },
-{ "note":"G#6/Ab6", "freq":"1661.22" },
-{ "note":"A6", "freq":"1760.00" },
-{ "note":"A#6/Bb6", "freq":"1864.66" },
-{ "note":"B6", "freq":"1975.53" },
-{ "note":"C7", "freq":"2093.00" },
-{ "note":"C#7/Db7", "freq":"2217.46" },
-{ "note":"D7", "freq":"2349.32" },
-{ "note":"D#7/Eb7", "freq":"2489.02" },
-{ "note":"E7", "freq":"2637.02" },
-{ "note":"F7", "freq":"2793.83" },
-{ "note":"F#7/Gb7", "freq":"2959.96" },
-{ "note":"G7", "freq":"3135.96" },
-{ "note":"G#7/Ab7", "freq":"3322.44" },
-{ "note":"A7", "freq":"3520.00" },
-{ "note":"A#7/Bb7", "freq":"3729.31" },
-{ "note":"B7", "freq":"3951.07" },
-{ "note":"C8", "freq":"4186.01" },
-{ "note":"C#8/Db8", "freq":"4434.92" },
-{ "note":"D8", "freq":"4698.63" },
-{ "note":"D#8/Eb8", "freq":"4978.03" },
-{ "note":"E8", "freq":"5274.04" },
-{ "note":"F8", "freq":"5587.65" },
-{ "note":"F#8/Gb8", "freq":"5919.91" },
-{ "note":"G8", "freq":"6271.93" },
-{ "note":"G#8/Ab8", "freq":"6644.88" },
-{ "note":"A8", "freq":"7040.00" },
-{ "note":"A#8/Bb8", "freq":"7458.62" },
-{ "note":"B8", "freq":"7902.13" }
+    { note: "C0", freq: "16.35" },
+    { note: "C#0/Db", freq: "17.32" },
+    { note: "D0", freq: "18.35" },
+    { note: "D#0/Eb", freq: "19.45" },
+    { note: "E0", freq: "20.60" },
+    { note: "F0", freq: "21.83" },
+    { note: "F#0/Gb0", freq: "23.12" },
+    { note: "G0", freq: "24.50" },
+    { note: "G#0/Ab0", freq: "25.96" },
+    { note: "A0", freq: "27.50" },
+    { note: "A#0/Bb0", freq: "29.14" },
+    { note: "B0", freq: "30.87" },
+    { note: "C1", freq: "32.70" },
+    { note: "C#1/Db1", freq: "34.65" },
+    { note: "D1", freq: "36.71" },
+    { note: "D#1/Eb1", freq: "38.89" },
+    { note: "E1", freq: "41.20" },
+    { note: "F1", freq: "43.65" },
+    { note: "F#1/Gb1", freq: "46.25" },
+    { note: "G1", freq: "49.00" },
+    { note: "G#1/Ab1", freq: "51.91" },
+    { note: "A1", freq: "55.00" },
+    { note: "A#1/Bb1", freq: "58.27" },
+    { note: "B1", freq: "61.74" },
+    { note: "C2", freq: "65.41" },
+    { note: "C#2/Db2", freq: "69.30" },
+    { note: "D2", freq: "73.42" },
+    { note: "D#2/Eb2", freq: "77.78" },
+    { note: "E2", freq: "82.41" },
+    { note: "F2", freq: "87.31" },
+    { note: "F#2/Gb2", freq: "92.50" },
+    { note: "G2", freq: "98.00" },
+    { note: "G#2/Ab2", freq: "103.83" },
+    { note: "A2", freq: "110.00" },
+    { note: "A#2/Bb2", freq: "116.54" },
+    { note: "B2", freq: "123.47" },
+    { note: "C3", freq: "130.81" },
+    { note: "C#3/Db3", freq: "138.59" },
+    { note: "D3", freq: "146.83" },
+    { note: "D#3/Eb3", freq: "155.56" },
+    { note: "E3", freq: "164.81" },
+    { note: "F3", freq: "174.61" },
+    { note: "F#3/Gb3", freq: "185.00" },
+    { note: "G3", freq: "196.00" },
+    { note: "G#3/Ab3", freq: "207.65" },
+    { note: "A3", freq: "220.00" },
+    { note: "A#3/Bb3", freq: "233.08" },
+    { note: "B3", freq: "246.94" },
+    { note: "C4", freq: "261.63" },
+    { note: "C#4/Db4", freq: "277.18" },
+    { note: "D4", freq: "293.66" },
+    { note: "D#4/Eb4", freq: "311.13" },
+    { note: "E4", freq: "329.63" },
+    { note: "F4", freq: "349.23" },
+    { note: "F#4/Gb4", freq: "369.99" },
+    { note: "G4", freq: "392.00" },
+    { note: "G#4/Ab4", freq: "415.30" },
+    { note: "A4", freq: "440.00" },
+    { note: "A#4/Bb4", freq: "466.16" },
+    { note: "B4", freq: "493.88" },
+    { note: "C5", freq: "523.25" },
+    { note: "C#5/Db5", freq: "554.37" },
+    { note: "D5", freq: "587.33" },
+    { note: "D#5/Eb5", freq: "622.25" },
+    { note: "E5", freq: "659.25" },
+    { note: "F5", freq: "698.46" },
+    { note: "F#5/Gb5", freq: "739.99" },
+    { note: "G5", freq: "783.99" },
+    { note: "G#5/Ab5", freq: "830.61" },
+    { note: "A5", freq: "880.00" },
+    { note: "A#5/Bb5", freq: "932.33" },
+    { note: "B5", freq: "987.77" },
+    { note: "C6", freq: "1046.50" },
+    { note: "C#6/Db6", freq: "1108.73" },
+    { note: "D6", freq: "1174.66" },
+    { note: "D#6/Eb6", freq: "1244.51" },
+    { note: "E6", freq: "1318.51" },
+    { note: "F6", freq: "1396.91" },
+    { note: "F#6/Gb6", freq: "1479.98" },
+    { note: "G6", freq: "1567.98" },
+    { note: "G#6/Ab6", freq: "1661.22" },
+    { note: "A6", freq: "1760.00" },
+    { note: "A#6/Bb6", freq: "1864.66" },
+    { note: "B6", freq: "1975.53" },
+    { note: "C7", freq: "2093.00" },
+    { note: "C#7/Db7", freq: "2217.46" },
+    { note: "D7", freq: "2349.32" },
+    { note: "D#7/Eb7", freq: "2489.02" },
+    { note: "E7", freq: "2637.02" },
+    { note: "F7", freq: "2793.83" },
+    { note: "F#7/Gb7", freq: "2959.96" },
+    { note: "G7", freq: "3135.96" },
+    { note: "G#7/Ab7", freq: "3322.44" },
+    { note: "A7", freq: "3520.00" },
+    { note: "A#7/Bb7", freq: "3729.31" },
+    { note: "B7", freq: "3951.07" },
+    { note: "C8", freq: "4186.01" },
+    { note: "C#8/Db8", freq: "4434.92" },
+    { note: "D8", freq: "4698.63" },
+    { note: "D#8/Eb8", freq: "4978.03" },
+    { note: "E8", freq: "5274.04" },
+    { note: "F8", freq: "5587.65" },
+    { note: "F#8/Gb8", freq: "5919.91" },
+    { note: "G8", freq: "6271.93" },
+    { note: "G#8/Ab8", freq: "6644.88" },
+    { note: "A8", freq: "7040.00" },
+    { note: "A#8/Bb8", freq: "7458.62" },
+    { note: "B8", freq: "7902.13" },
 ];
 
-function addSine(buf, freq, amp, phase, add, include, sampleRate) {
-    if (!include) return;
+// ============================================================
+// State
+// ============================================================
+let gain = 0.8;
+let zoom = 1;
+let waves = [];
+let looping = false;
+let waveVisible = false;
+let nextId = 0;
+
+let aud = null;
+let buffer = null;
+let buf = null;
+let sourceNode = null;
+
+const persistFrames = [];
+
+// ============================================================
+// Wave model
+// ============================================================
+class Wave {
+    constructor(id, freq, amp, phase, enabled) {
+        this.id = id;
+        this.freq = freq;
+        this.amp = amp;
+        this.phase = phase;
+        this.enabled = enabled;
+    }
+}
+
+// ============================================================
+// Audio buffer synthesis
+// ============================================================
+function getSampleRate() {
+    return (aud && aud.sampleRate) ? aud.sampleRate : kSampleRate;
+}
+
+function clearBuffer() {
+    buf.fill(0);
+}
+
+function writeSine(buf, freq, amp, phase, enabled, sampleRate) {
+    if (!enabled) return;
     const rate = sampleRate || kSampleRate;
     const len = buf.length;
     for (let i = 0; i < len; ++i) {
-        const val = Math.sin(freq * kPI_2 * i / rate + phase);
-        if (add) {
-            buf[i] = buf[i] + (val * amp * gain);
-        } else {
-            buf[i] = val * amp * gain;
-        }
+        buf[i] += Math.sin(freq * kPI_2 * i / rate + phase) * amp * gain;
     }
 }
 
-function wave(id, freq, amp, phase, enabled) {
-    this.id = id;
-    this.freq = freq;
-    this.amp = amp;
-    this.phase = phase;
-    this.enabled = enabled;
-}
-
-function addSines(buf, waves) {
-    const rate = (typeof aud !== 'undefined' && aud) ? aud.sampleRate : kSampleRate;
-    for (let i = 0; i < waves.length; i++) {
-        addSine(buf, waves[i].freq, waves[i].amp, waves[i].phase, (i < waves.length), waves[i].enabled, rate);
+function writeSines(buf, waves) {
+    const rate = getSampleRate();
+    for (const w of waves) {
+        writeSine(buf, w.freq, w.amp, w.phase, w.enabled, rate);
     }
 }
 
-function draw(showWave) {
-    waveVisible = showWave;
-    c.width = c.width;
+function rebuildBuffer() {
+    ensureAudioContext();
+    clearBuffer();
+    writeSines(buf, waves);
+    draw(true);
+}
 
-    const w = c.width;
-    const h = c.height;
+// ============================================================
+// Canvas rendering
+// ============================================================
+function drawBackground(ctx, w, h) {
     const cx = w / 2;
     const cy = h / 2;
 
-    // CRT phosphor background
     const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
     bgGrad.addColorStop(0, "#0a140a");
     bgGrad.addColorStop(0.6, "#060f06");
@@ -370,19 +445,21 @@ function draw(showWave) {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // Vignette
     const vig = ctx.createRadialGradient(cx, cy, w * 0.1, cx, cy, Math.max(w, h) * 0.75);
     vig.addColorStop(0, "rgba(0,0,0,0)");
     vig.addColorStop(0.7, "rgba(0,0,0,0.15)");
     vig.addColorStop(1, "rgba(0,0,0,0.55)");
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, w, h);
+}
 
-    // Graticule - 10 horizontal x 8 vertical major divisions
+function drawGraticule(ctx, w, h) {
+    const cx = w / 2;
+    const cy = h / 2;
     const divX = w / 10;
     const divY = h / 8;
 
-    // Minor grid (5 subdivisions)
+    // Minor grid
     ctx.beginPath();
     ctx.strokeStyle = "rgba(80, 200, 100, 0.035)";
     ctx.lineWidth = 1;
@@ -433,68 +510,70 @@ function draw(showWave) {
         ctx.lineTo(cx + 6, y + 0.5);
     }
     ctx.stroke();
+}
 
-    // Phosphor persistence
-    if (persistFrames.length > 0) {
-        persistFrames.forEach((frame, i) => {
-            const alpha = 0.18 * Math.pow(0.55, persistFrames.length - 1 - i);
-            ctx.strokeStyle = `rgba(100, 255, 160, ${alpha})`;
-            ctx.lineWidth = 1.5;
-            ctx.lineJoin = "round";
-            ctx.lineCap = "round";
-            ctx.beginPath();
-            let first = true;
-            for (let x = 0; x < w; x++) {
-                const y = frame[x];
-                if (y !== undefined) {
-                    if (first) { ctx.moveTo(x, y); first = false; }
-                    else { ctx.lineTo(x, y); }
-                }
-            }
-            ctx.stroke();
-        });
-    }
-
-    // Current waveform
-    if (showWave && buf && buf.length > 0) {
-        const currentFrame = new Array(w);
-        ctx.beginPath();
-        let first = true;
-        for (let x = 0; x < w; ++x) {
-            const sample = Math.min(buf.length - 1, Math.round(x * zoom));
-            const y = cy + buf[sample] * -divY * 3.5;
-            currentFrame[x] = y;
-            if (first) { ctx.moveTo(x, y); first = false; }
-            else { ctx.lineTo(x, y); }
-        }
-        // Main trace - bright phosphor green
-        ctx.strokeStyle = "#64ffa0";
-        ctx.lineWidth = 2;
+function drawPersistenceFrames(ctx, w, h) {
+    if (persistFrames.length === 0) return;
+    persistFrames.forEach((frame, i) => {
+        const alpha = 0.18 * Math.pow(0.55, persistFrames.length - 1 - i);
+        ctx.strokeStyle = `rgba(100, 255, 160, ${alpha})`;
+        ctx.lineWidth = 1.5;
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
-        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
-        ctx.shadowBlur = 6;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Bright core
         ctx.beginPath();
-        first = true;
-        for (let x = 0; x < w; ++x) {
-            const y = currentFrame[x];
-            if (first) { ctx.moveTo(x, y); first = false; }
-            else { ctx.lineTo(x, y); }
+        let first = true;
+        for (let x = 0; x < w; x++) {
+            const y = frame[x];
+            if (y !== undefined) {
+                if (first) { ctx.moveTo(x, y); first = false; }
+                else { ctx.lineTo(x, y); }
+            }
         }
-        ctx.strokeStyle = "rgba(200, 255, 220, 0.95)";
-        ctx.lineWidth = 1;
         ctx.stroke();
+    });
+}
 
-        // Update persistence
-        persistFrames.push(currentFrame);
-        if (persistFrames.length > MAX_PERSIST) persistFrames.shift();
+function drawWaveform(ctx, w, h) {
+    const cy = h / 2;
+    const divY = h / 8;
+    const currentFrame = new Array(w);
+
+    // Dim trace (phosphor persistence)
+    ctx.beginPath();
+    let first = true;
+    for (let x = 0; x < w; ++x) {
+        const sample = Math.min(buf.length - 1, Math.round(x * zoom));
+        const y = cy + buf[sample] * -divY * 3.5;
+        currentFrame[x] = y;
+        if (first) { ctx.moveTo(x, y); first = false; }
+        else { ctx.lineTo(x, y); }
     }
+    ctx.strokeStyle = "#64ffa0";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+    ctx.shadowBlur = 6;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
 
-    // Scanlines
+    // Bright core
+    ctx.beginPath();
+    first = true;
+    for (let x = 0; x < w; ++x) {
+        const y = currentFrame[x];
+        if (first) { ctx.moveTo(x, y); first = false; }
+        else { ctx.lineTo(x, y); }
+    }
+    ctx.strokeStyle = "rgba(200, 255, 220, 0.95)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    persistFrames.push(currentFrame);
+    if (persistFrames.length > MAX_PERSIST) persistFrames.shift();
+}
+
+function drawScanlines(ctx, w, h) {
     ctx.beginPath();
     ctx.strokeStyle = "rgba(0, 40, 0, 0.12)";
     ctx.lineWidth = 1;
@@ -503,8 +582,9 @@ function draw(showWave) {
         ctx.lineTo(w, y + 0.5);
     }
     ctx.stroke();
+}
 
-    // CRT corner bezel hints
+function drawBezel(ctx, w, h) {
     ctx.strokeStyle = "rgba(40, 80, 40, 0.25)";
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
@@ -520,37 +600,53 @@ function draw(showWave) {
     ctx.moveTo(inset, h - inset - r);
     ctx.lineTo(inset, inset + r);
     ctx.stroke();
+}
 
-    // Scale readouts
+function drawReadouts(ctx, w, h) {
     const sampleRate = getSampleRate();
+    const divX = w / 10;
     const msPerDiv = (divX * zoom) / sampleRate * 1000;
     ctx.font = "11px 'SF Mono', 'Monaco', 'Inconsolata', monospace";
     ctx.fillStyle = "rgba(120, 220, 160, 0.55)";
+
     ctx.textAlign = "left";
     ctx.fillText(`TIME/DIV ${msPerDiv.toFixed(2)}ms`, 12, 18);
+
     ctx.textAlign = "right";
     ctx.fillText(`V/DIV ${(gain * 1.4).toFixed(1)}V`, w - 12, 18);
+
     ctx.textAlign = "left";
-    ctx.fillText(`COUPLING DC`, 12, h - 10);
+    ctx.fillText("COUPLING DC", 12, h - 10);
+
     ctx.textAlign = "right";
-    ctx.fillText(`TRIG AUTO`, w - 12, h - 10);
+    ctx.fillText("TRIG AUTO", w - 12, h - 10);
 }
-</script>
 
-<script>
-// Safari-friendly AudioContext: create lazily on first user gesture (Play button),
-// and create the buffer at the AudioContext's *actual* sample rate (often 48000 on
-// Safari/iOS). Creating the context at load time suspends it in Safari until a
-// user gesture; creating the buffer at a hardcoded 44100 when the context runs
-// at 48000 caused silent/broken playback on Safari.
-let aud = null;
-let buffer = null;
-let buf = null;
-let sourceNode = null;
-let looping = false;
-let waveVisible = false;
-let waves = [];
+function draw(showWave) {
+    waveVisible = showWave;
+    const canvas = document.getElementById("myCanvas");
+    canvas.width = canvas.width;
 
+    const w = canvas.width;
+    const h = canvas.height;
+    const ctx = canvas.getContext("2d");
+
+    drawBackground(ctx, w, h);
+    drawGraticule(ctx, w, h);
+    drawPersistenceFrames(ctx, w, h);
+
+    if (showWave && buf && buf.length > 0) {
+        drawWaveform(ctx, w, h);
+    }
+
+    drawScanlines(ctx, w, h);
+    drawBezel(ctx, w, h);
+    drawReadouts(ctx, w, h);
+}
+
+// ============================================================
+// Web Audio API
+// ============================================================
 function ensureAudioContext() {
     if (!aud) {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -559,22 +655,17 @@ function ensureAudioContext() {
         buffer = aud.createBuffer(1, Math.round(kNumSamples * rate / kSampleRate), rate);
         buf = buffer.getChannelData(0);
         clearBuffer();
-        addSines(buf, waves);
+        writeSines(buf, waves);
         draw(waveVisible);
-        powerOn();
+        setPowerLed(true);
     }
     return aud;
 }
 
-function powerOn() {
+function setPowerLed(on) {
     const led = document.getElementById("powerLed");
-    if (led) led.classList.add("on");
-}
-
-function clearBuffer() {
-    for (let i = 0; i < buf.length; ++i) {
-        buf[i] = 0.0;
-    }
+    if (!led) return;
+    led.classList.toggle("on", on);
 }
 
 function play() {
@@ -587,41 +678,54 @@ function play() {
     node.buffer = buffer;
     node.loop = looping;
     node.connect(aud.destination);
-    node.onended = function() { if (node === sourceNode) sourceNode = null; };
+    node.onended = function () {
+        if (node === sourceNode) sourceNode = null;
+    };
     node.start(0);
     sourceNode = node;
+    setPowerLed(true);
 }
 
 function stop() {
     if (sourceNode) {
-        try { sourceNode.stop(); } catch (e) { }
+        try { sourceNode.stop(); } catch (e) { /* already stopped */ }
         sourceNode = null;
     }
-    const led = document.getElementById("powerLed");
-    if (led) led.classList.remove("on");
+    setPowerLed(false);
 }
 
-function toggleLoop(checkbox) {
-    looping = checkbox.checked;
+function toggleLoop() {
+    looping = document.getElementById("loopToggle").checked;
     if (sourceNode) sourceNode.loop = looping;
 }
 
-function setZoom(slider) {
-    zoom = slider.value / 100;
-    document.getElementById("zoom").textContent = zoom.toFixed(2) + "x";
+// ============================================================
+// Wave lookup
+// ============================================================
+function findWave(id) {
+    return waves.find(function (w) { return w.id == id; }) || null;
+}
+
+// ============================================================
+// UI — Event handlers
+// ============================================================
+function setGain(value) {
+    gain = value / 100;
+    document.getElementById("gainReadout").textContent = value;
+    rebuildBuffer();
+}
+
+function setZoom(value) {
+    zoom = value / 100;
+    document.getElementById("zoomReadout").textContent = zoom.toFixed(2) + "x";
     draw(waveVisible);
 }
 
 function toggleWave(id) {
+    const w = findWave(id);
+    if (w) w.enabled = !w.enabled;
     ensureAudioContext();
-    for (let i = 0; i < waves.length; i++) {
-        if (waves[i].id == id) {
-            waves[i].enabled = !waves[i].enabled;
-        }
-    }
-    clearBuffer();
-    addSines(buf, waves);
-    draw(true);
+    rebuildBuffer();
 }
 
 function clearWaveforms() {
@@ -629,83 +733,67 @@ function clearWaveforms() {
     clearBuffer();
     waves = [];
     draw(false);
-    const tbody = document.getElementById("wave_table").tBodies[0];
+    const tbody = document.getElementById("waveTable").tBodies[0];
     while (tbody.rows.length > 0) {
         tbody.deleteRow(0);
     }
 }
 
-function setGain(slider) {
+function removeWave(id) {
+    waves = waves.filter(function (w) { return w.id != id; });
+    const row = document.getElementById(id + "_freq").closest("tr");
+    if (row) row.remove();
     ensureAudioContext();
-    document.getElementById("gain").textContent = slider.value;
-    gain = slider.value / 100;
     clearBuffer();
-    addSines(buf, waves);
-    draw(true);
-}
-
-function addWaves(add) {
-    if (add) {
-        ensureAudioContext();
-        clearBuffer();
-        addSines(buf, waves);
-        draw(true);
-    }
-}
-
-function findWave(id) {
-    for (let i = 0; i < waves.length; i++) {
-        if (waves[i].id == id) {
-            return waves[i];
-        }
-    }
-    return null;
+    writeSines(buf, waves);
+    draw(waves.length > 0);
 }
 
 function updateFreqFromDD(id) {
-    const freq = document.getElementById(id + '_freq');
-    const dd = document.getElementById(id + '_note');
-    const wav = findWave(id);
-    if (wav) wav.freq = dd.value;
+    const freq = document.getElementById(id + "_freq");
+    const dd = document.getElementById(id + "_note");
+    const w = findWave(id);
+    if (!w) return;
+    w.freq = dd.value;
     freq.value = dd.value;
-    if (wav) addWaves(wav.enabled);
+    if (w.enabled) rebuildBuffer();
 }
 
 function updateFreq(id) {
-    const freq = document.getElementById(id + '_freq');
-    const dd = document.getElementById(id + '_note');
+    const freq = document.getElementById(id + "_freq");
+    const dd = document.getElementById(id + "_note");
     dd.selectedIndex = 0;
-    const wav = findWave(id);
-    if (wav) {
-        wav.freq = freq.value;
-        addWaves(wav.enabled);
-    }
+    const w = findWave(id);
+    if (!w) return;
+    w.freq = freq.value;
+    if (w.enabled) rebuildBuffer();
 }
 
 function updateAmp(slider) {
-    const id = slider.id.substring(4);
-    const wav = findWave(id);
-    if (wav) {
-        wav.amp = slider.value / 100;
-        addWaves(wav.enabled);
-    }
+    const id = slider.id.replace("amp_", "");
+    const w = findWave(id);
+    if (!w) return;
+    w.amp = slider.value / 100;
+    if (w.enabled) rebuildBuffer();
 }
 
 function updatePhase(slider) {
-    const id = slider.id.substring(6);
-    const wav = findWave(id);
-    if (wav) {
-        wav.phase = slider.value / 100 * Math.PI * 2;
-        addWaves(wav.enabled);
-    }
+    const id = slider.id.replace("phase_", "");
+    const w = findWave(id);
+    if (!w) return;
+    w.phase = slider.value / 100 * Math.PI * 2;
+    if (w.enabled) rebuildBuffer();
 }
 
+// ============================================================
+// UI — Row construction
+// ============================================================
 function makeEnabledToggle(id, enabled) {
     const cell = document.createElement("td");
     const pill = document.createElement("span");
     pill.className = enabled ? "toggle on" : "toggle";
     pill.textContent = enabled ? "ON" : "OFF";
-    pill.addEventListener("click", function() {
+    pill.addEventListener("click", function () {
         const on = pill.classList.toggle("on");
         pill.textContent = on ? "ON" : "OFF";
         toggleWave(id);
@@ -721,91 +809,86 @@ function makeRemoveButton(id) {
     btn.className = "ghost";
     btn.textContent = "✕";
     btn.title = "Remove wave";
-    btn.addEventListener("click", function() { removeWave(id); });
+    btn.addEventListener("click", function () { removeWave(id); });
     cell.appendChild(btn);
     return cell;
 }
-
-function removeWave(id) {
-    ensureAudioContext();
-    waves = waves.filter(function(w) { return w.id != id; });
-    const row = document.getElementById(id + "_freq").closest("tr");
-    if (row) row.remove();
-    clearBuffer();
-    addSines(buf, waves);
-    draw(waves.length > 0);
-}
-
-let nextId = 0;
 
 function addRow(opts) {
     ensureAudioContext();
     opts = opts || {};
     const freq = opts.freq != null ? opts.freq : kFrequency;
-    const amp = opts.amp != null ? opts.amp : 0.5;
+    const amp  = opts.amp != null ? opts.amp : 0.5;
     const phase = opts.phase != null ? opts.phase : 0;
     const enabled = !!opts.enabled;
-    const id = (Date.now() * 1000) + (nextId++);
+    const id = Date.now() * 1000 + nextId++;
 
-    waves.push(new wave(id, freq, amp, phase, enabled));
+    waves.push(new Wave(id, freq, amp, phase, enabled));
 
-    const tbody = document.getElementById("wave_table").tBodies[0];
+    const tbody = document.getElementById("waveTable").tBodies[0];
     const row = tbody.insertRow(-1);
 
+    // Frequency text input
     const freqCell = row.insertCell(-1);
     const freqInput = document.createElement("input");
     freqInput.type = "text";
     freqInput.id = id + "_freq";
     freqInput.value = freq;
-    freqInput.addEventListener("change", function() { updateFreq(id); });
+    freqInput.addEventListener("change", function () { updateFreq(id); });
     freqCell.appendChild(freqInput);
 
+    // Amplitude slider
     const ampCell = row.insertCell(-1);
-    const ampInput = document.createElement("input");
-    ampInput.type = "range";
-    ampInput.min = "1";
-    ampInput.max = "100";
-    ampInput.id = "amp_" + id;
-    ampInput.value = Math.round(amp * 100);
-    ampInput.className = "range";
-    ampInput.addEventListener("input", function() { updateAmp(this); });
-    ampCell.appendChild(ampInput);
+    const ampSlider = document.createElement("input");
+    ampSlider.type = "range";
+    ampSlider.min = "1";
+    ampSlider.max = "100";
+    ampSlider.id = "amp_" + id;
+    ampSlider.value = Math.round(amp * 100);
+    ampSlider.className = "range";
+    ampSlider.addEventListener("input", function () { updateAmp(this); });
+    ampCell.appendChild(ampSlider);
 
+    // Phase slider
     const phaseCell = row.insertCell(-1);
-    const phaseInput = document.createElement("input");
-    phaseInput.type = "range";
-    phaseInput.min = "0";
-    phaseInput.max = "360";
-    phaseInput.id = "phase_" + id;
-    phaseInput.value = Math.round(phase * 100 / (Math.PI * 2));
-    phaseInput.className = "range";
-    phaseInput.addEventListener("input", function() { updatePhase(this); });
-    phaseCell.appendChild(phaseInput);
+    const phaseSlider = document.createElement("input");
+    phaseSlider.type = "range";
+    phaseSlider.min = "0";
+    phaseSlider.max = "360";
+    phaseSlider.id = "phase_" + id;
+    phaseSlider.value = Math.round(phase * 100 / (Math.PI * 2));
+    phaseSlider.className = "range";
+    phaseSlider.addEventListener("input", function () { updatePhase(this); });
+    phaseCell.appendChild(phaseSlider);
 
+    // Note dropdown
     const noteCell = row.insertCell(-1);
     const select = document.createElement("select");
     select.name = "notes";
     select.id = id + "_note";
-    select.addEventListener("change", function() { updateFreqFromDD(id); });
+    select.addEventListener("change", function () { updateFreqFromDD(id); });
     const none = document.createElement("option");
     none.value = "-1";
     none.textContent = "None";
     select.appendChild(none);
-    for (let i = 0; i < notes.length; i++) {
+    for (const n of notes) {
         const option = document.createElement("option");
-        option.value = notes[i].freq;
-        option.textContent = notes[i].note;
+        option.value = n.freq;
+        option.textContent = n.note;
         select.appendChild(option);
     }
     noteCell.appendChild(select);
 
     row.appendChild(makeEnabledToggle(id, enabled));
     row.appendChild(makeRemoveButton(id));
+
     return id;
 }
 
+// ============================================================
+// Presets
+// ============================================================
 function loadPreset(shape) {
-    ensureAudioContext();
     clearWaveforms();
     const f0 = kFrequency;
     const partials = 8;
@@ -827,58 +910,29 @@ function loadPreset(shape) {
         }
         addRow({ freq: f0 * n, amp: amp * 0.8, phase: phase, enabled: true });
     }
-    clearBuffer();
-    addSines(buf, waves);
-    draw(true);
+    rebuildBuffer();
 }
+
+// ============================================================
+// DOM initialization
+// ============================================================
+document.getElementById("gainSlider").addEventListener("input", function () {
+    setGain(this.value);
+});
+document.getElementById("zoomSlider").addEventListener("input", function () {
+    setZoom(this.value);
+});
+document.getElementById("loopToggle").addEventListener("change", toggleLoop);
+document.getElementById("playBtn").addEventListener("click", play);
+document.getElementById("stopBtn").addEventListener("click", stop);
+document.getElementById("clearBtn").addEventListener("click", clearWaveforms);
+document.getElementById("addWaveBtn").addEventListener("click", addRow);
+
+document.querySelectorAll(".preset-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+        loadPreset(this.dataset.preset);
+    });
+});
 </script>
-
-<div id="controls" class="panel controls">
-    <div class="control">
-        <label for="gain_slider">Gain</label>
-        <input name="gain_slider" type="range" min="1" max="200" value="80" id="gain_slider" oninput="setGain(this)">
-        <span class="readout" id="gain">80</span>
-    </div>
-    <div class="control">
-        <label for="zoom_slider">Zoom</label>
-        <input name="zoom_slider" type="range" min="20" max="800" value="100" id="zoom_slider" oninput="setZoom(this)">
-        <span class="readout" id="zoom">1.00x</span>
-    </div>
-    <div class="control">
-        <label for="loop_toggle">Loop</label>
-        <input type="checkbox" id="loop_toggle" onchange="toggleLoop(this)">
-    </div>
-    <div class="spacer"></div>
-    <button type="button" onclick="play()">▶ Play</button>
-    <button type="button" class="secondary small" onclick="stop()">■ Stop</button>
-    <button type="button" class="secondary small" onclick="clearWaveforms()">Clear</button>
-</div>
-
-<div class="panel presets">
-    <span class="label">Presets</span>
-    <button type="button" class="secondary small" onclick="loadPreset('sine')">Sine</button>
-    <button type="button" class="secondary small" onclick="loadPreset('saw')">Sawtooth</button>
-    <button type="button" class="secondary small" onclick="loadPreset('square')">Square</button>
-    <button type="button" class="secondary small" onclick="loadPreset('triangle')">Triangle</button>
-</div>
-
-<div class="panel">
-    <table id="wave_table">
-        <thead>
-        <tr>
-            <th>Frequency Hz</th>
-            <th>Amplitude</th>
-            <th>Phase (°)</th>
-            <th>Note</th>
-            <th>Enabled</th>
-            <th></th>
-        </tr>
-        </thead>
-        <tbody>
-        </tbody>
-    </table>
-    <button type="button" class="secondary add-row" onclick="addRow()">+ Add Wave</button>
-</div>
-</div>
 </body>
 </html>
