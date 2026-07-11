@@ -205,7 +205,7 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
         </canvas>
     </div>
     <div class="screen">
-        <span class="screen-label">Spectrum</span>
+        <span class="screen-label" id="specLabel">Spectrum</span>
         <canvas id="specCanvas" class="scope-canvas" width="640" height="480" data-mode="spec">
             Your browser does not support the HTML5 canvas tag.
         </canvas>
@@ -231,6 +231,7 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     <button type="button" id="playBtn">▶ Play</button>
     <button type="button" class="secondary small" id="stopBtn">■ Stop</button>
     <button type="button" class="secondary small" id="clearBtn">Clear</button>
+    <button type="button" class="secondary small" id="xyBtn">XY</button>
 </div>
 
 <div class="panel">
@@ -460,6 +461,9 @@ let isNoteOn = false;
     let midiInput = null;
     let midiRatio = 1.0;
     let midiNote = -1;
+
+    let xyMode = false;
+    let xyPhaseOffset = Math.PI / 2;
 
 const persistFrames = [];
 
@@ -785,6 +789,67 @@ function drawSpectrum(ctx, w, h) {
     ctx.stroke();
 }
 
+function drawXY(ctx, w, h) {
+    if (!buf || buf.length === 0) return;
+    const cx = w / 2;
+    const cy = h / 2;
+    const scale = Math.min(w, h) * 0.35;
+
+    // Phase offset in samples: derive from xyPhaseOffset and the first enabled wave's period
+    let delay = Math.round(100 * zoom); // default fixed delay
+    for (const w of waves) {
+        if (w.enabled && w.freq > 0) {
+            const periodSamples = getSampleRate() / w.freq;
+            delay = Math.round((xyPhaseOffset / (2 * Math.PI)) * periodSamples);
+            break;
+        }
+    }
+    if (delay < 1) delay = 1;
+    if (delay > buf.length - 1) delay = buf.length - 1;
+
+    // Draw the XY trace (Lissajous figure)
+    ctx.beginPath();
+    ctx.strokeStyle = "#64ffa0";
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.shadowColor = "rgba(100, 255, 160, 0.8)";
+    ctx.shadowBlur = 5;
+    let first = true;
+    for (let i = 0; i < w; i++) {
+        const sampleIdx = Math.min(buf.length - 1, Math.round(i * zoom));
+        const delayIdx = Math.min(buf.length - 1, sampleIdx + delay);
+        const x = cx + buf[sampleIdx] * scale;
+        const y = cy + buf[delayIdx] * -scale; // invert Y for oscilloscope convention
+        if (first) { ctx.moveTo(x, y); first = false; }
+        else { ctx.lineTo(x, y); }
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Draw crosshair axes
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(100, 220, 140, 0.15)";
+    ctx.lineWidth = 1;
+    ctx.moveTo(cx + 0.5, 0);
+    ctx.lineTo(cx + 0.5, h);
+    ctx.moveTo(0, cy + 0.5);
+    ctx.lineTo(w, cy + 0.5);
+    ctx.stroke();
+
+    // Readouts for XY mode
+    ctx.font = "11px 'SF Mono', 'Monaco', 'Inconsolata', monospace";
+    ctx.fillStyle = "rgba(120, 220, 160, 0.55)";
+    ctx.textAlign = "left";
+    ctx.fillText("XY MODE", 12, 18);
+    ctx.textAlign = "right";
+    ctx.fillText("PHASE " + (xyPhaseOffset * 180 / Math.PI).toFixed(0) + "°", w - 12, 18);
+    ctx.textAlign = "left";
+    ctx.fillText("DELAY " + delay + "SMP", 12, h - 10);
+    ctx.textAlign = "right";
+    ctx.fillText("XY", w - 12, h - 10);
+}
+
 function drawScanlines(ctx, w, h) {
     ctx.beginPath();
     ctx.strokeStyle = "rgba(0, 40, 0, 0.12)";
@@ -877,7 +942,11 @@ function draw(showWave) {
     if (specCanvas) {
         paintScope(specCanvas, function (ctx, w, h) {
             if (buf && buf.length > 0) {
-                drawSpectrum(ctx, w, h);
+                if (xyMode) {
+                    drawXY(ctx, w, h);
+                } else {
+                    drawSpectrum(ctx, w, h);
+                }
             }
         });
     }
@@ -1293,6 +1362,14 @@ document.getElementById("playBtn").addEventListener("click", noteOn);
 document.getElementById("stopBtn").addEventListener("click", function() { noteOff(false); });
 document.getElementById("clearBtn").addEventListener("click", clearWaveforms);
 document.getElementById("addWaveBtn").addEventListener("click", addRow);
+
+// XY mode toggle
+document.getElementById("xyBtn").addEventListener("click", function () {
+    xyMode = !xyMode;
+    this.classList.toggle("on");
+    document.getElementById("specLabel").textContent = xyMode ? "XY" : "Spectrum";
+    draw(true);
+});
 
 // ADSR sliders
 document.getElementById("attackSlider").addEventListener("input", function () {
