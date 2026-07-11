@@ -259,6 +259,26 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
   </div>
 </div>
 
+<div class="panel">
+  <div class="controls">
+    <span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">MIDI</span>
+    <div class="control">
+      <label for="midiDevice">Device</label>
+      <select id="midiDevice">
+        <option value="">-- No device --</option>
+      </select>
+    </div>
+    <div class="control">
+      <span class="label">Note</span>
+      <span class="readout" id="midiNoteDisplay">--</span>
+    </div>
+    <div class="control">
+      <span class="label">Status</span>
+      <span class="readout" id="midiStatus" style="color:var(--muted);">Disconnected</span>
+    </div>
+  </div>
+</div>
+
 <div class="panel presets">
     <span class="label">Presets</span>
     <button type="button" class="secondary small preset-btn" data-preset="sine">Sine</button>
@@ -435,6 +455,12 @@ let sourceNode = null;
 let masterGain = null;
 let isNoteOn = false;
 
+
+    let midiAccess = null;
+    let midiInput = null;
+    let midiRatio = 1.0;
+    let midiNote = -1;
+
 const persistFrames = [];
 
 // Spectrum (frequency-domain) cache + precomputed FFT tables.
@@ -479,7 +505,7 @@ function writeSine(buf, freq, amp, phase, enabled, sampleRate) {
 function writeSines(buf, waves) {
     const rate = getSampleRate();
     for (const w of waves) {
-        writeSine(buf, w.freq, w.amp, w.phase, w.enabled, rate);
+        writeSine(buf, w.freq * midiRatio, w.amp, w.phase, w.enabled, rate);
     }
 }
 
@@ -942,6 +968,103 @@ function toggleLoop() {
 }
 
 // ============================================================
+// MIDI
+// ============================================================
+function midiNoteToFreq(note) {
+    return 440 * Math.pow(2, (note - 69) / 12);
+}
+
+function getMidiRefFreq() {
+    for (const w of waves) {
+        if (w.enabled) return w.freq;
+    }
+    return kFrequency;
+}
+
+function onMIDIMessage(event) {
+    const [status, note, velocity] = event.data;
+    if ((status & 0xF0) === 0x90 && velocity > 0) {
+        // Note On
+        if (isNoteOn) noteOff(true);
+        const freq = midiNoteToFreq(note);
+        const refFreq = getMidiRefFreq();
+        midiRatio = freq / refFreq;
+        midiNote = note;
+        const noteObj = notes.find(function (n) { return Math.abs(parseFloat(n.freq) - freq) < 0.01; });
+        document.getElementById("midiNoteDisplay").textContent = noteObj ? noteObj.note : note;
+        document.getElementById("midiStatus").textContent = "On";
+        document.getElementById("midiStatus").style.color = "var(--accent)";
+        rebuildBuffer();
+        noteOn();
+    } else if ((status & 0xF0) === 0x80 || ((status & 0xF0) === 0x90 && velocity === 0)) {
+        // Note Off
+        if (note === midiNote) {
+            noteOff(false);
+            midiNote = -1;
+            document.getElementById("midiNoteDisplay").textContent = "--";
+            document.getElementById("midiStatus").textContent = "Connected";
+            document.getElementById("midiStatus").style.color = "var(--muted)";
+        }
+    }
+}
+
+function setMidiDevice(deviceId) {
+    if (midiInput) {
+        midiInput.onmidimessage = null;
+        midiInput = null;
+    }
+    if (!deviceId) {
+        document.getElementById("midiStatus").textContent = "Disconnected";
+        document.getElementById("midiStatus").style.color = "var(--muted)";
+        return;
+    }
+    midiInput = midiAccess.inputs.get(deviceId);
+    if (midiInput) {
+        midiInput.onmidimessage = onMIDIMessage;
+        document.getElementById("midiStatus").textContent = "Connected";
+        document.getElementById("midiStatus").style.color = "var(--accent)";
+    }
+}
+
+function initMIDI() {
+    const deviceSelect = document.getElementById("midiDevice");
+    if (!navigator.requestMIDIAccess) {
+        deviceSelect.disabled = true;
+        deviceSelect.innerHTML = '<option value="">Not supported</option>';
+        document.getElementById("midiStatus").textContent = "Not supported";
+        return;
+    }
+    navigator.requestMIDIAccess().then(function (access) {
+        midiAccess = access;
+        function populateDevices() {
+            const cur = deviceSelect.value;
+            deviceSelect.innerHTML = '<option value="">-- No device --</option>';
+            for (const input of midiAccess.inputs.values()) {
+                const opt = document.createElement("option");
+                opt.value = input.id;
+                opt.textContent = input.name || input.id;
+                deviceSelect.appendChild(opt);
+            }
+            if (cur && midiAccess.inputs.has(cur)) deviceSelect.value = cur;
+        }
+        populateDevices();
+        midiAccess.onstatechange = function () { populateDevices(); };
+        deviceSelect.addEventListener("change", function () {
+            setMidiDevice(this.value);
+        });
+        // Auto-connect to first available device
+        if (midiAccess.inputs.size > 0) {
+            const first = midiAccess.inputs.values().next().value;
+            deviceSelect.value = first.id;
+            setMidiDevice(first.id);
+        }
+    }).catch(function (err) {
+        console.warn("MIDI access error:", err);
+        document.getElementById("midiStatus").textContent = "Denied";
+    });
+}
+
+// ============================================================
 // Wave lookup
 // ============================================================
 function findWave(id) {
@@ -1194,6 +1317,8 @@ document.querySelectorAll(".preset-btn").forEach(function (btn) {
         loadPreset(this.dataset.preset);
     });
 });
+
+initMIDI();
 
 // Light up both scopes with their graticule at startup (buf is still empty).
 draw(false);
