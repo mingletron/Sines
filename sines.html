@@ -79,7 +79,15 @@ header .sub { color: var(--muted); font-size: 12px; font-weight: 400; letter-spa
         inset 0 0 80px rgba(80, 200, 120, 0.03),
         inset 0 -40px 60px rgba(80, 200, 120, 0.02);
 }
-#myCanvas {
+.screens { display: flex; gap: 16px; flex-wrap: wrap; }
+.screens > .screen { flex: 1 1 460px; min-width: 0; margin: 0; }
+.screen-label {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    z-index: 12; pointer-events: none;
+    font-size: 10px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
+    color: rgba(120, 220, 160, 0.45);
+}
+.scope-canvas {
     display: block; width: 100%; height: auto; border-radius: 6px;
     background: #020602;
 }
@@ -189,10 +197,19 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     <h1>OSCILLOSCOPE</h1>
     <span class="sub">additive sine synthesis</span>
 </header>
-<div class="screen">
-<canvas id="myCanvas" width="1000" height="600">
-Your browser does not support the HTML5 canvas tag.
-</canvas>
+<div class="screens">
+    <div class="screen">
+        <span class="screen-label">Wave</span>
+        <canvas id="waveCanvas" class="scope-canvas" width="640" height="480" data-mode="wave">
+            Your browser does not support the HTML5 canvas tag.
+        </canvas>
+    </div>
+    <div class="screen">
+        <span class="screen-label">Spectrum</span>
+        <canvas id="specCanvas" class="scope-canvas" width="640" height="480" data-mode="spec">
+            Your browser does not support the HTML5 canvas tag.
+        </canvas>
+    </div>
 </div>
 
 <div id="controls" class="panel controls">
@@ -252,9 +269,12 @@ const kNumSamples = kSampleRate * 2;
 const kFrequency  = 440;
 const kPI_2       = Math.PI * 2;
 const MAX_PERSIST = 4;
+const FFT_SIZE    = 4096;   // radix-2 FFT window (must be a power of 2)
+const LOG2_FFT    = 12;     // log2(FFT_SIZE)
+const FREQ_MAX    = 4000;   // displayed frequency span, Hz
 
 // ============================================================
-// Note frequency table (87-tone piano from C0 to B8)
+// Note frequency table (108-tone, C0 to B8 — 9 octaves)
 // ============================================================
 const notes = [
     { note: "C0", freq: "16.35" },
@@ -384,6 +404,11 @@ let sourceNode = null;
 
 const persistFrames = [];
 
+// Spectrum (frequency-domain) cache + precomputed FFT tables.
+let spectrumDirty = true;
+let spectrumCache = null;
+let fftRe = null, fftIm = null, fftWin = null, fftBitRev = null, fftCosT = null, fftSinT = null;
+
 // ============================================================
 // Wave model
 // ============================================================
@@ -406,6 +431,7 @@ function getSampleRate() {
 
 function clearBuffer() {
     buf.fill(0);
+    spectrumDirty = true;
 }
 
 function writeSine(buf, freq, amp, phase, enabled, sampleRate) {
@@ -429,6 +455,89 @@ function rebuildBuffer() {
     clearBuffer();
     writeSines(buf, waves);
     draw(true);
+}
+
+// ============================================================
+// Frequency analysis (FFT)
+// ============================================================
+// Precompute the Hann window, bit-reversal permutation, and twiddle factors
+// for FFT_SIZE once. All buffers are reused across calls.
+function ensureFftTables() {
+    if (fftWin) return;
+    const N = FFT_SIZE;
+    fftRe = new Float32Array(N);
+    fftIm = new Float32Array(N);
+    fftWin = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+        fftWin[i] = 0.5 - 0.5 * Math.cos(kPI_2 * i / (N - 1));
+    }
+    fftBitRev = new Uint32Array(N);
+    for (let i = 0; i < N; i++) {
+        let x = i, r = 0;
+        for (let b = 0; b < LOG2_FFT; b++) { r = (r << 1) | (x & 1); x >>= 1; }
+        fftBitRev[i] = r;
+    }
+    const half = N / 2;
+    fftCosT = new Float32Array(half);
+    fftSinT = new Float32Array(half);
+    for (let i = 0; i < half; i++) {
+        fftCosT[i] = Math.cos(-kPI_2 * i / N);
+        fftSinT[i] = Math.sin(-kPI_2 * i / N);
+    }
+}
+
+// In-place iterative radix-2 Cooley–Tukey FFT. re/im are Float32Arrays of length N.
+function fft(re, im) {
+    const N = re.length;
+    for (let i = 0; i < N; i++) {
+        const j = fftBitRev[i];
+        if (j > i) {
+            let t = re[i]; re[i] = re[j]; re[j] = t;
+            t = im[i]; im[i] = im[j]; im[j] = t;
+        }
+    }
+    for (let len = 2; len <= N; len <<= 1) {
+        const half = len >> 1;
+        const step = N / len;
+        for (let i = 0; i < N; i += len) {
+            for (let k = 0; k < half; k++) {
+                const ti = k * step;
+                const c = fftCosT[ti], s = fftSinT[ti];
+                const a = i + k, b = a + half;
+                const reB = re[b] * c - im[b] * s;
+                const imB = re[b] * s + im[b] * c;
+                re[b] = re[a] - reB;
+                im[b] = im[a] - imB;
+                re[a] += reB;
+                im[a] += imB;
+            }
+        }
+    }
+}
+
+// Returns a Float32Array of bin magnitudes (length FFT_SIZE/2), cached until the
+// next clearBuffer() marks it dirty. The FFT is taken over the first FFT_SIZE
+// samples of buf with a Hann window to reduce spectral leakage.
+function computeSpectrum() {
+    if (!buf || buf.length === 0) return null;
+    ensureFftTables();
+    if (spectrumDirty || !spectrumCache) {
+        const N = FFT_SIZE;
+        const n = Math.min(N, buf.length);
+        for (let i = 0; i < N; i++) {
+            fftRe[i] = i < n ? buf[i] * fftWin[i] : 0;
+            fftIm[i] = 0;
+        }
+        fft(fftRe, fftIm);
+        const half = N / 2;
+        const mags = new Float32Array(half);
+        for (let i = 0; i < half; i++) {
+            mags[i] = Math.sqrt(fftRe[i] * fftRe[i] + fftIm[i] * fftIm[i]);
+        }
+        spectrumCache = mags;
+        spectrumDirty = false;
+    }
+    return spectrumCache;
 }
 
 // ============================================================
@@ -573,6 +682,50 @@ function drawWaveform(ctx, w, h) {
     if (persistFrames.length > MAX_PERSIST) persistFrames.shift();
 }
 
+function drawSpectrum(ctx, w, h) {
+    const mags = computeSpectrum();
+    if (!mags) return;
+    const rate = getSampleRate();
+    const binHz = rate / FFT_SIZE;
+    const maxBin = Math.min(mags.length, Math.ceil(FREQ_MAX / binHz));
+
+    // Auto-normalize to the tallest visible peak so relative bar heights are preserved.
+    let maxMag = 0;
+    for (let i = 1; i < maxBin; i++) if (mags[i] > maxMag) maxMag = mags[i];
+    if (maxMag <= 0) return;
+
+    const baseY = h - 26;
+    const topY = 26;
+    const span = baseY - topY;
+
+    // Each x pixel maps to a frequency bin; drawn as a glowing vertical bar.
+    ctx.beginPath();
+    ctx.strokeStyle = "#64ffa0";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "butt";
+    ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+    ctx.shadowBlur = 6;
+    for (let x = 0; x < w; x++) {
+        const freq = (x / w) * FREQ_MAX;
+        let bin = Math.round(freq / binHz);
+        if (bin < 1) bin = 1;
+        if (bin >= maxBin) continue;
+        const barH = (mags[bin] / maxMag) * span;
+        ctx.moveTo(x + 0.5, baseY);
+        ctx.lineTo(x + 0.5, baseY - barH);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Baseline
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(100, 220, 140, 0.25)";
+    ctx.lineWidth = 1;
+    ctx.moveTo(0, baseY + 0.5);
+    ctx.lineTo(w, baseY + 0.5);
+    ctx.stroke();
+}
+
 function drawScanlines(ctx, w, h) {
     ctx.beginPath();
     ctx.strokeStyle = "rgba(0, 40, 0, 0.12)";
@@ -602,46 +755,73 @@ function drawBezel(ctx, w, h) {
     ctx.stroke();
 }
 
-function drawReadouts(ctx, w, h) {
-    const sampleRate = getSampleRate();
-    const divX = w / 10;
-    const msPerDiv = (divX * zoom) / sampleRate * 1000;
+function drawReadouts(ctx, w, h, mode) {
     ctx.font = "11px 'SF Mono', 'Monaco', 'Inconsolata', monospace";
     ctx.fillStyle = "rgba(120, 220, 160, 0.55)";
 
+    if (mode === "spec") {
+        ctx.textAlign = "left";
+        ctx.fillText(`FREQ SPAN 0–${(FREQ_MAX / 1000).toFixed(1)}kHz`, 12, 18);
+        ctx.textAlign = "right";
+        ctx.fillText("REF AUTO", w - 12, 18);
+        ctx.textAlign = "left";
+        ctx.fillText(`FFT ${FFT_SIZE}`, 12, h - 10);
+        ctx.textAlign = "right";
+        ctx.fillText("LIN", w - 12, h - 10);
+        return;
+    }
+
+    const sampleRate = getSampleRate();
+    const divX = w / 10;
+    const msPerDiv = (divX * zoom) / sampleRate * 1000;
     ctx.textAlign = "left";
     ctx.fillText(`TIME/DIV ${msPerDiv.toFixed(2)}ms`, 12, 18);
-
     ctx.textAlign = "right";
     ctx.fillText(`V/DIV ${(gain * 1.4).toFixed(1)}V`, w - 12, 18);
-
     ctx.textAlign = "left";
     ctx.fillText("COUPLING DC", 12, h - 10);
-
     ctx.textAlign = "right";
     ctx.fillText("TRIG AUTO", w - 12, h - 10);
 }
 
-function draw(showWave) {
-    waveVisible = showWave;
-    const canvas = document.getElementById("myCanvas");
-    canvas.width = canvas.width;
-
+// Paints one CRT screen: background → graticule → content → scanlines → bezel → readouts.
+// `content` draws the screen-specific trace between the graticule and the scanlines.
+function paintScope(canvas, content) {
+    canvas.width = canvas.width; // clear
     const w = canvas.width;
     const h = canvas.height;
     const ctx = canvas.getContext("2d");
+    const mode = canvas.dataset.mode || "wave";
 
     drawBackground(ctx, w, h);
     drawGraticule(ctx, w, h);
-    drawPersistenceFrames(ctx, w, h);
-
-    if (showWave && buf && buf.length > 0) {
-        drawWaveform(ctx, w, h);
-    }
-
+    content(ctx, w, h);
     drawScanlines(ctx, w, h);
     drawBezel(ctx, w, h);
-    drawReadouts(ctx, w, h);
+    drawReadouts(ctx, w, h, mode);
+}
+
+function draw(showWave) {
+    waveVisible = showWave;
+
+    const waveCanvas = document.getElementById("waveCanvas");
+    if (waveCanvas) {
+        paintScope(waveCanvas, function (ctx, w, h) {
+            drawPersistenceFrames(ctx, w, h);
+            if (showWave && buf && buf.length > 0) {
+                drawWaveform(ctx, w, h);
+            }
+        });
+    }
+
+    const specCanvas = document.getElementById("specCanvas");
+    if (specCanvas) {
+        paintScope(specCanvas, function (ctx, w, h) {
+            if (buf && buf.length > 0) {
+                drawSpectrum(ctx, w, h);
+            }
+        });
+    }
 }
 
 // ============================================================
@@ -933,6 +1113,9 @@ document.querySelectorAll(".preset-btn").forEach(function (btn) {
         loadPreset(this.dataset.preset);
     });
 });
+
+// Light up both scopes with their graticule at startup (buf is still empty).
+draw(false);
 </script>
 </body>
 </html>
