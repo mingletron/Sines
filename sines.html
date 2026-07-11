@@ -233,6 +233,32 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     <button type="button" class="secondary small" id="clearBtn">Clear</button>
 </div>
 
+<div class="panel">
+  <div class="controls">
+    <span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Envelope</span>
+    <div class="control">
+      <label for="attackSlider">A</label>
+      <input type="range" min="1" max="2000" value="50" id="attackSlider">
+      <span class="readout" id="attackReadout">50ms</span>
+    </div>
+    <div class="control">
+      <label for="decaySlider">D</label>
+      <input type="range" min="1" max="2000" value="100" id="decaySlider">
+      <span class="readout" id="decayReadout">100ms</span>
+    </div>
+    <div class="control">
+      <label for="sustainSlider">S</label>
+      <input type="range" min="0" max="100" value="70" id="sustainSlider">
+      <span class="readout" id="sustainReadout">0.70</span>
+    </div>
+    <div class="control">
+      <label for="releaseSlider">R</label>
+      <input type="range" min="1" max="2000" value="200" id="releaseSlider">
+      <span class="readout" id="releaseReadout">200ms</span>
+    </div>
+  </div>
+</div>
+
 <div class="panel presets">
     <span class="label">Presets</span>
     <button type="button" class="secondary small preset-btn" data-preset="sine">Sine</button>
@@ -392,6 +418,10 @@ const notes = [
 // ============================================================
 let gain = 0.8;
 let zoom = 1;
+let attack = 0.05;
+let decay = 0.1;
+let sustain = 0.7;
+let release = 0.2;
 let waves = [];
 let looping = false;
 let waveVisible = false;
@@ -401,6 +431,9 @@ let aud = null;
 let buffer = null;
 let buf = null;
 let sourceNode = null;
+
+let masterGain = null;
+let isNoteOn = false;
 
 const persistFrames = [];
 
@@ -439,7 +472,7 @@ function writeSine(buf, freq, amp, phase, enabled, sampleRate) {
     const rate = sampleRate || kSampleRate;
     const len = buf.length;
     for (let i = 0; i < len; ++i) {
-        buf[i] += Math.sin(freq * kPI_2 * i / rate + phase) * amp * gain;
+        buf[i] += Math.sin(freq * kPI_2 * i / rate + phase) * amp;
     }
 }
 
@@ -652,7 +685,7 @@ function drawWaveform(ctx, w, h) {
     let first = true;
     for (let x = 0; x < w; ++x) {
         const sample = Math.min(buf.length - 1, Math.round(x * zoom));
-        const y = cy + buf[sample] * -divY * 3.5;
+        const y = cy + buf[sample] * gain * -divY * 3.5;
         currentFrame[x] = y;
         if (first) { ctx.moveTo(x, y); first = false; }
         else { ctx.lineTo(x, y); }
@@ -834,6 +867,9 @@ function ensureAudioContext() {
         const rate = aud.sampleRate;
         buffer = aud.createBuffer(1, Math.round(kNumSamples * rate / kSampleRate), rate);
         buf = buffer.getChannelData(0);
+        masterGain = aud.createGain();
+        masterGain.gain.value = gain;
+        masterGain.connect(aud.destination);
         clearBuffer();
         writeSines(buf, waves);
         draw(waveVisible);
@@ -848,30 +884,56 @@ function setPowerLed(on) {
     led.classList.toggle("on", on);
 }
 
-function play() {
+function noteOn() {
     ensureAudioContext();
     if (aud.state === "suspended") {
         aud.resume();
     }
-    stop();
+    noteOff(true);
     const node = aud.createBufferSource();
     node.buffer = buffer;
     node.loop = looping;
-    node.connect(aud.destination);
+    // Fresh envelope gain node per note so its automation is independent.
+    const envGain = aud.createGain();
+    envGain.gain.value = 0;
+    envGain.connect(masterGain);
+    node.connect(envGain);
+    node._envGain = envGain;
+    const now = aud.currentTime;
+    const g = envGain.gain;
+    g.setValueAtTime(0, now);
+    g.linearRampToValueAtTime(gain, now + attack);
+    g.linearRampToValueAtTime(gain * sustain, now + attack + decay);
     node.onended = function () {
-        if (node === sourceNode) sourceNode = null;
+        if (node === sourceNode) {
+            sourceNode = null;
+            isNoteOn = false;
+            setPowerLed(false);
+        }
+        // Always release the per-note envelope node.
+        if (node._envGain) { node._envGain.disconnect(); node._envGain = null; }
     };
     node.start(0);
     sourceNode = node;
+    isNoteOn = true;
     setPowerLed(true);
 }
 
-function stop() {
-    if (sourceNode) {
-        try { sourceNode.stop(); } catch (e) { /* already stopped */ }
-        sourceNode = null;
+function noteOff(immediate) {
+    if (!sourceNode) return;
+    if (immediate) {
+        try { sourceNode.stop(); } catch (e) {}
+        isNoteOn = false;
+    } else {
+        if (!isNoteOn) return;
+        const now = aud.currentTime;
+        const g = sourceNode._envGain.gain;
+        g.cancelScheduledValues(now);
+        g.setValueAtTime(g.value, now);
+        g.linearRampToValueAtTime(0, now + release);
+        sourceNode.stop(now + release + 0.01);
+        isNoteOn = false;
     }
-    setPowerLed(false);
 }
 
 function toggleLoop() {
@@ -892,7 +954,8 @@ function findWave(id) {
 function setGain(value) {
     gain = value / 100;
     document.getElementById("gainReadout").textContent = value;
-    rebuildBuffer();
+    if (masterGain) masterGain.gain.value = gain;
+    draw(true);
 }
 
 function setZoom(value) {
@@ -1103,10 +1166,28 @@ document.getElementById("zoomSlider").addEventListener("input", function () {
     setZoom(this.value);
 });
 document.getElementById("loopToggle").addEventListener("change", toggleLoop);
-document.getElementById("playBtn").addEventListener("click", play);
-document.getElementById("stopBtn").addEventListener("click", stop);
+document.getElementById("playBtn").addEventListener("click", noteOn);
+document.getElementById("stopBtn").addEventListener("click", function() { noteOff(false); });
 document.getElementById("clearBtn").addEventListener("click", clearWaveforms);
 document.getElementById("addWaveBtn").addEventListener("click", addRow);
+
+// ADSR sliders
+document.getElementById("attackSlider").addEventListener("input", function () {
+    attack = this.value / 1000;
+    document.getElementById("attackReadout").textContent = this.value + "ms";
+});
+document.getElementById("decaySlider").addEventListener("input", function () {
+    decay = this.value / 1000;
+    document.getElementById("decayReadout").textContent = this.value + "ms";
+});
+document.getElementById("sustainSlider").addEventListener("input", function () {
+    sustain = this.value / 100;
+    document.getElementById("sustainReadout").textContent = sustain.toFixed(2);
+});
+document.getElementById("releaseSlider").addEventListener("input", function () {
+    release = this.value / 1000;
+    document.getElementById("releaseReadout").textContent = this.value + "ms";
+});
 
 document.querySelectorAll(".preset-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
