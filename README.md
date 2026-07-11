@@ -4,6 +4,10 @@ A single-file, zero-dependency browser instrument for **additive sine synthesis*
 
 No build step, no package manager, no frameworks — just one `sines.html` you can open directly in a browser.
 
+## Screenshot
+
+![Sines oscilloscope screenshot](SCR-20260711-opkt.jpg)
+
 ## Features
 
 ### Two live scopes, one signal source
