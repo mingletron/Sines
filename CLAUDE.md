@@ -20,7 +20,7 @@ The single `<script>` block is organized into sections (in order):
 Numeric constants for sample rate (44100), buffer length (2 seconds), default frequency (440 Hz), rendering, and the spectrum analyzer (FFT window size 4096, its log2, and the displayed frequency span 0–4000 Hz).
 
 ### Note frequency table (`notes`)
-Array of `{note, freq}` objects covering C0–B8 (87 tones). Populates the per-row note dropdowns.
+Array of `{note, freq}` objects covering C0–B8 (108 tones, 9 octaves). Populates the per-row note dropdowns.
 
 ### State (`gain`, `zoom`, `waves`, `looping`, `waveVisible`, `nextId`, `aud`, `buffer`, `buf`, `sourceNode`, `persistFrames`, `spectrumDirty`, `spectrumCache`, FFT tables)
 All mutable state is declared at the top of the script for visibility. `waves` is the array of active `Wave` objects. `buf` is the shared Float32Array serving as audio source, waveform data, and FFT input. `spectrumDirty`/`spectrumCache` avoid recomputing the FFT when only the view (e.g. `zoom`) changes.
