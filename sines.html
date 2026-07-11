@@ -1,39 +1,223 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<style type="text/css">
-.datagrid table { border-collapse: collapse; text-align: left; width: 100%; } .datagrid {font: normal 12px/150% Arial, Helvetica, sans-serif; background: #fff; overflow: hidden; border: 1px solid #A65B1A; color: #000000; -webkit-border-radius: 3px; -moz-border-radius: 3px; border-radius: 3px; }.datagrid table td, .datagrid table th { padding: 3px 10px; }.datagrid table thead th {background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #A65B1A), color-stop(1, #7F4614) );background:-moz-linear-gradient( center top, #A65B1A 5%, #7F4614 100% );filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#A65B1A', endColorstr='#7F4614');background-color:#A65B1A; color:#FFFFFF; font-size: 15px; font-weight: bold; border-left: 1px solid #BF691E; } .datagrid table thead th:first-child { border: none; }.datagrid table tbody td { color: #7F4614; border-left: 1px solid #D9CFB8;font-size: 12px;font-weight: normal; }.datagrid table tbody .alt td { background: #F0E5CC; color: #7F4614; }.datagrid table tbody td:first-child { border-left: none; }.datagrid table tbody tr:last-child td { border-bottom: none; }
-body {
-    background-color:#000000;
-    font: normal 12px/150% Arial, Helvetica, sans-serif;
-    font-size: 15px; font-weight: bold;
-    color: white;
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tek Sines — Oscilloscope</title>
+<style>
+:root {
+    --bg: #040806;
+    --panel: #0a150a;
+    --panel-2: #0f1a0f;
+    --border: #1a351a;
+    --text: #c8e8c8;
+    --muted: #6a8a6a;
+    --accent: #4aff8a;
+    --accent-dim: #2ac86a;
+    --radius: 14px;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
 }
-.wave { background-color:#7F4614;}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 30px 20px 60px;
+    background: radial-gradient(1200px 600px at 50% -10%, #081208, var(--bg));
+    color: var(--text);
+    font: 400 14px/1.5 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+}
+.app { max-width: 1000px; margin: 0 auto; }
+header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
+}
+header .brand { display: flex; align-items: center; gap: 10px; }
+#powerLed {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #1a0; border: 2px solid #060;
+    box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 8px #0a0;
+    transition: all 0.3s ease;
+}
+#powerLed.on {
+    background: #0f0; border-color: #0a0;
+    box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 18px #0f0, 0 0 36px #0f0;
+    animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 18px #0f0, 0 0 36px #0f0; }
+    50% { opacity: 0.7; box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 12px #0f0, 0 0 24px #0f0; }
+}
+header h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.02em; color: var(--accent); }
+header .sub { color: var(--muted); font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; }
+
+.screen {
+    position: relative;
+    padding: 16px;
+    background: #040806;
+    border: 3px solid #0d1a0d;
+    border-radius: 18px;
+    box-shadow:
+        0 0 0 2px #0a150a,
+        0 0 0 4px #142814,
+        0 20px 60px rgba(0, 0, 0, 0.8),
+        inset 0 0 120px rgba(80, 200, 120, 0.02),
+        inset 0 0 0 1px rgba(80, 200, 120, 0.05);
+    overflow: hidden;
+}
+.screen::before {
+    content: "";
+    position: absolute; inset: 16px; border-radius: 8px; pointer-events: none; z-index: 10;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 50%, transparent 60%, rgba(0,0,0,0.5) 100%),
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.06), rgba(0,0,0,0.06) 1px, transparent 1px, transparent 3px);
+    background-size: 100% 100%, 100% 4px;
+}
+.screen::after {
+    content: "";
+    position: absolute; inset: 14px; pointer-events: none; border-radius: 10px; z-index: 11;
+    box-shadow:
+        inset 0 0 0 1px rgba(80, 200, 120, 0.1),
+        inset 0 0 80px rgba(80, 200, 120, 0.03),
+        inset 0 -40px 60px rgba(80, 200, 120, 0.02);
+}
+#myCanvas {
+    display: block; width: 100%; height: auto; border-radius: 6px;
+    background: #020602;
+}
+
+.panel {
+    margin-top: 18px; padding: 16px 18px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.controls { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.control { display: flex; align-items: center; gap: 10px; }
+.control > label { color: var(--muted); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+.readout {
+    min-width: 50px; padding: 5px 10px;
+    text-align: center; font-variant-numeric: tabular-nums; font-size: 13px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--accent); font-family: inherit;
+}
+.spacer { flex: 1; }
+
+button {
+    font: inherit; font-weight: 600; font-size: 13px;
+    padding: 9px 18px; cursor: pointer;
+    color: #06210f;
+    background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+    border: none; border-radius: 10px;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+    transition: transform .06s ease, filter .15s ease, border-color .15s ease, color .15s ease;
+}
+button:hover { filter: brightness(1.08); }
+button:active { transform: translateY(1px); }
+button.secondary {
+    color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--border); box-shadow: none;
+}
+button.secondary:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+button.small { padding: 7px 13px; font-size: 12px; }
+button.ghost {
+    color: var(--muted); background: transparent;
+    border: 1px solid var(--border); box-shadow: none;
+    padding: 5px 11px; font-size: 12px; line-height: 1;
+}
+button.ghost:hover { color: #ff7676; border-color: #ff7676; filter: none; }
+
+input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 150px; height: 6px; margin: 0;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px;
+    cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); border: 2px solid #06210f;
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+}
+input[type=range]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); border: 2px solid #06210f;
+}
+
+input[type=text], select {
+    font: inherit; font-size: 13px;
+    padding: 6px 9px; width: 92px;
+    color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--border); border-radius: 8px;
+}
+select { width: auto; }
+input[type=text]:focus, select:focus, input[type=range]:focus-visible {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15);
+}
+
+table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+thead th {
+    padding: 8px 12px; text-align: left;
+    font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--border);
+}
+tbody td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+.toggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 54px; padding: 4px 0;
+    font-size: 11px; font-weight: 700; letter-spacing: .05em;
+    cursor: pointer; user-select: none; border-radius: 999px;
+    color: var(--muted); background: var(--panel-2); border: 1px solid var(--border);
+    transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.toggle.on { color: var(--accent); background: rgba(74, 222, 128, 0.15); border-color: var(--accent-dim); }
+
+.add-row { margin-top: 16px; }
+
+.presets { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.presets .label { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin-right: 2px; }
 </style>
 </head>
 <body>
-<h2>Crazy Waves</h2>
-<canvas id="myCanvas" width="800" height="600" style="border:1px solid #004000";>
+<div class="app">
+<header>
+    <div class="brand">
+        <span id="powerLed"></span>
+        <strong>TEK SINES</strong>
+    </div>
+    <h1>OSCILLOSCOPE</h1>
+    <span class="sub">additive sine synthesis</span>
+</header>
+<div class="screen">
+<canvas id="myCanvas" width="1000" height="600">
 Your browser does not support the HTML5 canvas tag.
 </canvas>
+</div>
 
 <script>
-var c = document.getElementById("myCanvas");
-const kSampleRate = 44100; // Other sample rates might not work depending on the your browser's AudioContext
+const c = document.getElementById("myCanvas");
+const kSampleRate = 44100;
 const kNumSamples = kSampleRate * 2;
 const kFrequency  = 440;
 const kPI_2       = Math.PI * 2;
-const amp         = .2;
-var gain = 0.8;
-var ctx = c.getContext("2d");
+const amp         = 0.2;
+let gain = 0.8;
+let zoom = 1;
+const ctx = c.getContext("2d");
 
-var notes = [
+let persistFrames = [];
+const MAX_PERSIST = 4;
+
+function getSampleRate() {
+    return (typeof aud !== 'undefined' && aud && aud.sampleRate) ? aud.sampleRate : kSampleRate;
+}
+
+const notes = [
 { "note":"C0", "freq":"16.35" },
-{ "note":"C#0/Db", "freq":"017.32" },
+{ "note":"C#0/Db", "freq":"17.32" },
 { "note":"D0", "freq":"18.35" },
-{ "note":"D#0/Eb", "freq":"019.45" },
+{ "note":"D#0/Eb", "freq":"19.45" },
 { "note":"E0", "freq":"20.60" },
 { "note":"F0", "freq":"21.83" },
 { "note":"F#0/Gb0", "freq":"23.12" },
@@ -113,7 +297,7 @@ var notes = [
 { "note":"G#6/Ab6", "freq":"1661.22" },
 { "note":"A6", "freq":"1760.00" },
 { "note":"A#6/Bb6", "freq":"1864.66" },
-{ "note":"B61", "freq":"975.53" },
+{ "note":"B6", "freq":"1975.53" },
 { "note":"C7", "freq":"2093.00" },
 { "note":"C#7/Db7", "freq":"2217.46" },
 { "note":"D7", "freq":"2349.32" },
@@ -125,7 +309,7 @@ var notes = [
 { "note":"G#7/Ab7", "freq":"3322.44" },
 { "note":"A7", "freq":"3520.00" },
 { "note":"A#7/Bb7", "freq":"3729.31" },
-{ "note":"B73", "freq":"951.07" },
+{ "note":"B7", "freq":"3951.07" },
 { "note":"C8", "freq":"4186.01" },
 { "note":"C#8/Db8", "freq":"4434.92" },
 { "note":"D8", "freq":"4698.63" },
@@ -140,11 +324,13 @@ var notes = [
 { "note":"B8", "freq":"7902.13" }
 ];
 
-function addSine(buf, freq, amp, phase, add, include){
+function addSine(buf, freq, amp, phase, add, include, sampleRate) {
     if (!include) return;
-    for (i = 0; i < kNumSamples; ++i) {
-        var val = Math.sin(freq * kPI_2 * i / kSampleRate + phase);
-        if (add){
+    const rate = sampleRate || kSampleRate;
+    const len = buf.length;
+    for (let i = 0; i < len; ++i) {
+        const val = Math.sin(freq * kPI_2 * i / rate + phase);
+        if (add) {
             buf[i] = buf[i] + (val * amp * gain);
         } else {
             buf[i] = val * amp * gain;
@@ -152,7 +338,7 @@ function addSine(buf, freq, amp, phase, add, include){
     }
 }
 
-function wave(id,freq, amp, phase, enabled){
+function wave(id, freq, amp, phase, enabled) {
     this.id = id;
     this.freq = freq;
     this.amp = amp;
@@ -160,274 +346,539 @@ function wave(id,freq, amp, phase, enabled){
     this.enabled = enabled;
 }
 
-function addSines(buf, waves){
-    for (var i = 0; i < waves.length; i++) {
-        addSine(buf, waves[i].freq, waves[i].amp, waves[i].phase, (i < waves.length), waves[i].enabled);
+function addSines(buf, waves) {
+    const rate = (typeof aud !== 'undefined' && aud) ? aud.sampleRate : kSampleRate;
+    for (let i = 0; i < waves.length; i++) {
+        addSine(buf, waves[i].freq, waves[i].amp, waves[i].phase, (i < waves.length), waves[i].enabled, rate);
     }
 }
 
-
-function draw(wave){
-    
-ctx.strokeStyle = "#004000";
-    ctx.stroke();
+function draw(showWave) {
+    waveVisible = showWave;
     c.width = c.width;
 
-    for (var x = 0.5; x < 800; x += 10) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, 600);
-    }
+    const w = c.width;
+    const h = c.height;
+    const cx = w / 2;
+    const cy = h / 2;
 
-    for (var y = 0.5; y < 600; y += 10) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(800, y);
-    }
+    // CRT phosphor background
+    const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
+    bgGrad.addColorStop(0, "#0a140a");
+    bgGrad.addColorStop(0.6, "#060f06");
+    bgGrad.addColorStop(1, "#020802");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
 
-    ctx.strokeStyle = "#004000";
-    ctx.stroke();
+    // Vignette
+    const vig = ctx.createRadialGradient(cx, cy, w * 0.1, cx, cy, Math.max(w, h) * 0.75);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(0.7, "rgba(0,0,0,0.15)");
+    vig.addColorStop(1, "rgba(0,0,0,0.55)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, w, h);
 
+    // Graticule - 10 horizontal x 8 vertical major divisions
+    const divX = w / 10;
+    const divY = h / 8;
+
+    // Minor grid (5 subdivisions)
     ctx.beginPath();
-    ctx.moveTo(0,300.5);
-    ctx.lineTo(800,300.5);
-
-    ctx.strokeStyle = "#007700";
+    ctx.strokeStyle = "rgba(80, 200, 100, 0.035)";
+    ctx.lineWidth = 1;
+    for (let x = divX * 0.2; x < w; x += divX * 0.2) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, h);
+    }
+    for (let y = divY * 0.2; y < h; y += divY * 0.2) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(w, y + 0.5);
+    }
     ctx.stroke();
 
-    if (wave)
-    {
-        ctx.beginPath();
-        ctx.moveTo(0,299.5);
-        ctx.strokeStyle = "#00FF00";
-        for (i = 0; i < 800; ++i) {
-            ctx.lineTo(i, (buf[i] * -300) + 300);
-        }
-        ctx.stroke();
+    // Major grid
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(80, 200, 100, 0.09)";
+    ctx.lineWidth = 1;
+    for (let x = divX; x < w; x += divX) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, h);
     }
+    for (let y = divY; y < h; y += divY) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(w, y + 0.5);
+    }
+    ctx.stroke();
+
+    // Center axes
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(100, 220, 140, 0.18)";
+    ctx.lineWidth = 1;
+    ctx.moveTo(cx + 0.5, 0);
+    ctx.lineTo(cx + 0.5, h);
+    ctx.moveTo(0, cy + 0.5);
+    ctx.lineTo(w, cy + 0.5);
+    ctx.stroke();
+
+    // Tick marks on center axes
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(100, 220, 140, 0.35)";
+    ctx.lineWidth = 1;
+    for (let x = divX; x < w; x += divX) {
+        ctx.moveTo(x + 0.5, cy - 6);
+        ctx.lineTo(x + 0.5, cy + 6);
+    }
+    for (let y = divY; y < h; y += divY) {
+        ctx.moveTo(cx - 6, y + 0.5);
+        ctx.lineTo(cx + 6, y + 0.5);
+    }
+    ctx.stroke();
+
+    // Phosphor persistence
+    if (persistFrames.length > 0) {
+        persistFrames.forEach((frame, i) => {
+            const alpha = 0.18 * Math.pow(0.55, persistFrames.length - 1 - i);
+            ctx.strokeStyle = `rgba(100, 255, 160, ${alpha})`;
+            ctx.lineWidth = 1.5;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            let first = true;
+            for (let x = 0; x < w; x++) {
+                const y = frame[x];
+                if (y !== undefined) {
+                    if (first) { ctx.moveTo(x, y); first = false; }
+                    else { ctx.lineTo(x, y); }
+                }
+            }
+            ctx.stroke();
+        });
+    }
+
+    // Current waveform
+    if (showWave && buf && buf.length > 0) {
+        const currentFrame = new Array(w);
+        ctx.beginPath();
+        let first = true;
+        for (let x = 0; x < w; ++x) {
+            const sample = Math.min(buf.length - 1, Math.round(x * zoom));
+            const y = cy + buf[sample] * -divY * 3.5;
+            currentFrame[x] = y;
+            if (first) { ctx.moveTo(x, y); first = false; }
+            else { ctx.lineTo(x, y); }
+        }
+        // Main trace - bright phosphor green
+        ctx.strokeStyle = "#64ffa0";
+        ctx.lineWidth = 2;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+        ctx.shadowBlur = 6;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Bright core
+        ctx.beginPath();
+        first = true;
+        for (let x = 0; x < w; ++x) {
+            const y = currentFrame[x];
+            if (first) { ctx.moveTo(x, y); first = false; }
+            else { ctx.lineTo(x, y); }
+        }
+        ctx.strokeStyle = "rgba(200, 255, 220, 0.95)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Update persistence
+        persistFrames.push(currentFrame);
+        if (persistFrames.length > MAX_PERSIST) persistFrames.shift();
+    }
+
+    // Scanlines
+    ctx.beginPath();
+    ctx.strokeStyle = "rgba(0, 40, 0, 0.12)";
+    ctx.lineWidth = 1;
+    for (let y = 0; y < h; y += 2) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(w, y + 0.5);
+    }
+    ctx.stroke();
+
+    // CRT corner bezel hints
+    ctx.strokeStyle = "rgba(40, 80, 40, 0.25)";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    const r = 18;
+    const inset = 4;
+    ctx.moveTo(inset + r, inset);
+    ctx.lineTo(w - inset - r, inset);
+    ctx.moveTo(w - inset, inset + r);
+    ctx.lineTo(w - inset, h - inset - r);
+    ctx.moveTo(w - inset - r, h - inset);
+    ctx.lineTo(inset + r, h - inset);
+    ctx.moveTo(inset, h - inset - r);
+    ctx.lineTo(inset, inset + r);
+    ctx.stroke();
+
+    // Scale readouts
+    const sampleRate = getSampleRate();
+    const msPerDiv = (divX * zoom) / sampleRate * 1000;
+    ctx.font = "11px 'SF Mono', 'Monaco', 'Inconsolata', monospace";
+    ctx.fillStyle = "rgba(120, 220, 160, 0.55)";
+    ctx.textAlign = "left";
+    ctx.fillText(`TIME/DIV ${msPerDiv.toFixed(2)}ms`, 12, 18);
+    ctx.textAlign = "right";
+    ctx.fillText(`V/DIV ${(gain * 1.4).toFixed(1)}V`, w - 12, 18);
+    ctx.textAlign = "left";
+    ctx.fillText(`COUPLING DC`, 12, h - 10);
+    ctx.textAlign = "right";
+    ctx.fillText(`TRIG AUTO`, w - 12, h - 10);
 }
-
-
-
 </script>
 
 <script>
+// Safari-friendly AudioContext: create lazily on first user gesture (Play button),
+// and create the buffer at the AudioContext's *actual* sample rate (often 48000 on
+// Safari/iOS). Creating the context at load time suspends it in Safari until a
+// user gesture; creating the buffer at a hardcoded 44100 when the context runs
+// at 48000 caused silent/broken playback on Safari.
+let aud = null;
+let buffer = null;
+let buf = null;
+let sourceNode = null;
+let looping = false;
+let waveVisible = false;
+let waves = [];
 
-var ua = navigator.userAgent.toLowerCase(); 
-if (ua.indexOf('safari') > -1 && ua.indexOf('chrome') == -1 ) {
-    window.AudioContext = window.webkitAudioContext;
+function ensureAudioContext() {
+    if (!aud) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        aud = new AC();
+        const rate = aud.sampleRate;
+        buffer = aud.createBuffer(1, Math.round(kNumSamples * rate / kSampleRate), rate);
+        buf = buffer.getChannelData(0);
+        clearBuffer();
+        addSines(buf, waves);
+        draw(waveVisible);
+        powerOn();
+    }
+    return aud;
 }
 
+function powerOn() {
+    const led = document.getElementById("powerLed");
+    if (led) led.classList.add("on");
+}
 
-var aud = new AudioContext();
-var buffer = aud.createBuffer(1, kNumSamples, kSampleRate);
-var buf  = buffer.getChannelData(0);
-var waves = new Array();
+function clearBuffer() {
+    for (let i = 0; i < buf.length; ++i) {
+        buf[i] = 0.0;
+    }
+}
 
-draw(false);
-
-function play(){
-    var node = aud.createBufferSource(0);
+function play() {
+    ensureAudioContext();
+    if (aud.state === "suspended") {
+        aud.resume();
+    }
+    stop();
+    const node = aud.createBufferSource();
     node.buffer = buffer;
+    node.loop = looping;
     node.connect(aud.destination);
+    node.onended = function() { if (node === sourceNode) sourceNode = null; };
     node.start(0);
+    sourceNode = node;
 }
 
-function toggleWave(id){
-    for (var i = 0; i < waves.length; i++) {
-        if (waves[i].id == id){
+function stop() {
+    if (sourceNode) {
+        try { sourceNode.stop(); } catch (e) { }
+        sourceNode = null;
+    }
+    const led = document.getElementById("powerLed");
+    if (led) led.classList.remove("on");
+}
+
+function toggleLoop(checkbox) {
+    looping = checkbox.checked;
+    if (sourceNode) sourceNode.loop = looping;
+}
+
+function setZoom(slider) {
+    zoom = slider.value / 100;
+    document.getElementById("zoom").textContent = zoom.toFixed(2) + "x";
+    draw(waveVisible);
+}
+
+function toggleWave(id) {
+    ensureAudioContext();
+    for (let i = 0; i < waves.length; i++) {
+        if (waves[i].id == id) {
             waves[i].enabled = !waves[i].enabled;
         }
     }
-    for (i = 0; i < kNumSamples; ++i) {
-    buf[i] = 0.0;
-    }
+    clearBuffer();
     addSines(buf, waves);
     draw(true);
-    
 }
 
-function addWave(){
-    for (i = 0; i < kNumSamples; ++i) {
-        buf[i] = 0.0;
-    }
-    var freq = document.getElementById("freq").value;
-    var amp = document.getElementById("amp_slider").value / 100;
-    var phase = 1;
-    var id = new Date().getTime();
-    waves.push(new wave(id,freq,amp,phase,true));
-    addSines(buf, waves);
-    draw(true);
-    var table = document.getElementById("wave_table");
-    var row = table.insertRow(-1);
-    var cell1 = row.insertCell(0);
-    var cell2 = row.insertCell(1);
-    var cell3 = row.insertCell(2);
-    cell1.innerHTML = freq;
-    cell2.innerHTML = amp * 100;
-    cell3.innerHTML = "Y";
-    cell3.addEventListener("click", function() {
-        this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
-        toggleWave(id);
-        });
-}
-
-function clearWaveforms(){
-    for (i = 0; i < kNumSamples; ++i) {
-        buf[i] = 0.0;
-    }
-    waves = new Array();
+function clearWaveforms() {
+    ensureAudioContext();
+    clearBuffer();
+    waves = [];
     draw(false);
-    var table = document.getElementById("wave_table");
-    var rows = table.rows.length;
-    for(var i = rows - 1; i > 0; i--)
-    {
-        table.deleteRow(i);
+    const tbody = document.getElementById("wave_table").tBodies[0];
+    while (tbody.rows.length > 0) {
+        tbody.deleteRow(0);
     }
 }
 
-
-function selectNote(sel){
-    var freq = document.getElementById("freq");
-    if (sel.value != -1)
-        freq.value = sel.value;
-}
-
-function setGain(slider){
-    document.getElementById("gain").value = slider.value;
+function setGain(slider) {
+    ensureAudioContext();
+    document.getElementById("gain").textContent = slider.value;
     gain = slider.value / 100;
-    for (i = 0; i < kNumSamples; ++i) {
-        buf[i] = 0.0;
-    }
+    clearBuffer();
     addSines(buf, waves);
-    draw(true);        
+    draw(true);
 }
 
-function addWaves(add){
+function addWaves(add) {
     if (add) {
-        for (i = 0; i < kNumSamples; ++i) {
-            buf[i] = 0.0;
-        }
+        ensureAudioContext();
+        clearBuffer();
         addSines(buf, waves);
         draw(true);
     }
 }
 
-function updateFreqFromDD(id){
-    var freq = document.getElementById(id + '_freq');
-    var dd = document.getElementById(id + '_note');
-
-    var wav;
-    for (var i = 0; i < waves.length; i++) {
-        if (waves[i].id == id){
-            waves[i].freq = dd.value;
-            wav = waves[i];
+function findWave(id) {
+    for (let i = 0; i < waves.length; i++) {
+        if (waves[i].id == id) {
+            return waves[i];
         }
     }
+    return null;
+}
 
+function updateFreqFromDD(id) {
+    const freq = document.getElementById(id + '_freq');
+    const dd = document.getElementById(id + '_note');
+    const wav = findWave(id);
+    if (wav) wav.freq = dd.value;
     freq.value = dd.value;
-    addWaves(wav.enabled);
+    if (wav) addWaves(wav.enabled);
 }
 
-function updateFreq(id){
-    var freq = document.getElementById(id + '_freq');
-    var dd = document.getElementById(id + '_note');
-    dd.options.selectedIndex = 0;
-    var wav;
-    for (var i = 0; i < waves.length; i++) {
-        if (waves[i].id == id){
-            waves[i].freq = freq.value;
-            wav = waves[i];
-        }
+function updateFreq(id) {
+    const freq = document.getElementById(id + '_freq');
+    const dd = document.getElementById(id + '_note');
+    dd.selectedIndex = 0;
+    const wav = findWave(id);
+    if (wav) {
+        wav.freq = freq.value;
+        addWaves(wav.enabled);
     }
-    
-    addWaves(wav.enabled);
 }
 
-function updateAmp(slider){
-    
-    var id = slider.id.substring(4);
-    var amplitude = slider.value / 100;
-
-    var wav;
-    for (var i = 0; i < waves.length; i++) {
-        if (waves[i].id == id){
-            waves[i].amp = amplitude;
-            wav = waves[i];
-        }
+function updateAmp(slider) {
+    const id = slider.id.substring(4);
+    const wav = findWave(id);
+    if (wav) {
+        wav.amp = slider.value / 100;
+        addWaves(wav.enabled);
     }
-    
-    addWaves(wav.enabled);
 }
 
-function updatePhase(slider){
-    
-    var id = slider.id.substring(6);
-    var phase = slider.value / 100;
-
-    var wav;
-    for (var i = 0; i < waves.length; i++) {
-        if (waves[i].id == id){
-            waves[i].phase = phase;
-            wav = waves[i];
-        }
+function updatePhase(slider) {
+    const id = slider.id.substring(6);
+    const wav = findWave(id);
+    if (wav) {
+        wav.phase = slider.value / 100 * Math.PI * 2;
+        addWaves(wav.enabled);
     }
-    
-    addWaves(wav.enabled);
 }
 
-function addRow(){
-    var id = new Date().getTime();
-    waves.push(new wave(id,kFrequency,.2,1,false));
-        var table = document.getElementById("wave_table");
-        var row = table.insertRow(-1);
-        var cell1 = row.insertCell(0);
-        var cell2 = row.insertCell(1);
-        var cell3 = row.insertCell(2);
-        var cell4 = row.insertCell(3);
-        var cell5 = row.insertCell(4);
+function makeEnabledToggle(id, enabled) {
+    const cell = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = enabled ? "toggle on" : "toggle";
+    pill.textContent = enabled ? "ON" : "OFF";
+    pill.addEventListener("click", function() {
+        const on = pill.classList.toggle("on");
+        pill.textContent = on ? "ON" : "OFF";
+        toggleWave(id);
+    });
+    cell.appendChild(pill);
+    return cell;
+}
 
-        cell1.innerHTML = '<input type="text" id="' + id + '_freq" value="' + kFrequency +'" onchange="updateFreq(' + id + ')">';
-        cell2.innerHTML = '<input type="range" min="1" max="100" id="amp_' + id + '" value="50" onChange="document.getElementById(" + id " + ").value=this.value;" onMouseUp="updateAmp(this)" onTouchEnd="updateAmp(this)" class="range">'
-        cell3.innerHTML = '<input type="range" min="0" max="360" id="phase_' + id + '" value="0" onChange="document.getElementById(" + id " + ").value=this.value;" onMouseUp="updatePhase(this)" onTouchEnd="updatePhase(this)" class="range">'
-        cell5.innerHTML = "N";
-        var dd = '<select name="notes" id="' + id + '_note" onchange="updateFreqFromDD(' + id + ')"><option value=-1>None</option>';
-        for (var i = 0; i < notes.length; i++) {
-            var fr = notes[i].freq;
-            var name = notes[i].note;
-            dd += '<option value=' + fr + '>' + name + '</option>';
+function makeRemoveButton(id) {
+    const cell = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "ghost";
+    btn.textContent = "✕";
+    btn.title = "Remove wave";
+    btn.addEventListener("click", function() { removeWave(id); });
+    cell.appendChild(btn);
+    return cell;
+}
+
+function removeWave(id) {
+    ensureAudioContext();
+    waves = waves.filter(function(w) { return w.id != id; });
+    const row = document.getElementById(id + "_freq").closest("tr");
+    if (row) row.remove();
+    clearBuffer();
+    addSines(buf, waves);
+    draw(waves.length > 0);
+}
+
+let nextId = 0;
+
+function addRow(opts) {
+    ensureAudioContext();
+    opts = opts || {};
+    const freq = opts.freq != null ? opts.freq : kFrequency;
+    const amp = opts.amp != null ? opts.amp : 0.5;
+    const phase = opts.phase != null ? opts.phase : 0;
+    const enabled = !!opts.enabled;
+    const id = (Date.now() * 1000) + (nextId++);
+
+    waves.push(new wave(id, freq, amp, phase, enabled));
+
+    const tbody = document.getElementById("wave_table").tBodies[0];
+    const row = tbody.insertRow(-1);
+
+    const freqCell = row.insertCell(-1);
+    const freqInput = document.createElement("input");
+    freqInput.type = "text";
+    freqInput.id = id + "_freq";
+    freqInput.value = freq;
+    freqInput.addEventListener("change", function() { updateFreq(id); });
+    freqCell.appendChild(freqInput);
+
+    const ampCell = row.insertCell(-1);
+    const ampInput = document.createElement("input");
+    ampInput.type = "range";
+    ampInput.min = "1";
+    ampInput.max = "100";
+    ampInput.id = "amp_" + id;
+    ampInput.value = Math.round(amp * 100);
+    ampInput.className = "range";
+    ampInput.addEventListener("input", function() { updateAmp(this); });
+    ampCell.appendChild(ampInput);
+
+    const phaseCell = row.insertCell(-1);
+    const phaseInput = document.createElement("input");
+    phaseInput.type = "range";
+    phaseInput.min = "0";
+    phaseInput.max = "360";
+    phaseInput.id = "phase_" + id;
+    phaseInput.value = Math.round(phase * 100 / (Math.PI * 2));
+    phaseInput.className = "range";
+    phaseInput.addEventListener("input", function() { updatePhase(this); });
+    phaseCell.appendChild(phaseInput);
+
+    const noteCell = row.insertCell(-1);
+    const select = document.createElement("select");
+    select.name = "notes";
+    select.id = id + "_note";
+    select.addEventListener("change", function() { updateFreqFromDD(id); });
+    const none = document.createElement("option");
+    none.value = "-1";
+    none.textContent = "None";
+    select.appendChild(none);
+    for (let i = 0; i < notes.length; i++) {
+        const option = document.createElement("option");
+        option.value = notes[i].freq;
+        option.textContent = notes[i].note;
+        select.appendChild(option);
+    }
+    noteCell.appendChild(select);
+
+    row.appendChild(makeEnabledToggle(id, enabled));
+    row.appendChild(makeRemoveButton(id));
+    return id;
+}
+
+function loadPreset(shape) {
+    ensureAudioContext();
+    clearWaveforms();
+    const f0 = kFrequency;
+    const partials = 8;
+    for (let n = 1; n <= partials; n++) {
+        let amp = 0;
+        let phase = 0;
+        if (shape === "sine") {
+            if (n > 1) continue;
+            amp = 1;
+        } else if (shape === "saw") {
+            amp = 1 / n;
+        } else if (shape === "square") {
+            if (n % 2 === 0) continue;
+            amp = 1 / n;
+        } else if (shape === "triangle") {
+            if (n % 2 === 0) continue;
+            amp = 1 / (n * n);
+            phase = (n % 4 === 3) ? Math.PI : 0;
         }
-        dd += '</select>';
-        cell4.innerHTML = dd;
-        cell5.addEventListener("click", function() {
-            this.innerHTML = this.innerHTML == "Y" ? "N" : "Y";
-            toggleWave(id);
-            });
+        addRow({ freq: f0 * n, amp: amp * 0.8, phase: phase, enabled: true });
+    }
+    clearBuffer();
+    addSines(buf, waves);
+    draw(true);
 }
-
 </script>
 
-<div id="controls" class="wave">
-    Gain<input name="gain_slider" type="range" min="1" max="200" value="80" id="gain_slider" onChange="document.getElementById('gain').value=this.value;" onMouseUp="setGain(this)" onTouchEnd="setGain(this)" class="range">
-    <input name="gain" id="gain" value="80" readonly="true" style="width:25px">
-    <button onclick="play()">Play</button>
-    <button onclick="clearWaveforms()">Clear</button>
+<div id="controls" class="panel controls">
+    <div class="control">
+        <label for="gain_slider">Gain</label>
+        <input name="gain_slider" type="range" min="1" max="200" value="80" id="gain_slider" oninput="setGain(this)">
+        <span class="readout" id="gain">80</span>
+    </div>
+    <div class="control">
+        <label for="zoom_slider">Zoom</label>
+        <input name="zoom_slider" type="range" min="20" max="800" value="100" id="zoom_slider" oninput="setZoom(this)">
+        <span class="readout" id="zoom">1.00x</span>
+    </div>
+    <div class="control">
+        <label for="loop_toggle">Loop</label>
+        <input type="checkbox" id="loop_toggle" onchange="toggleLoop(this)">
+    </div>
+    <div class="spacer"></div>
+    <button type="button" onclick="play()">▶ Play</button>
+    <button type="button" class="secondary small" onclick="stop()">■ Stop</button>
+    <button type="button" class="secondary small" onclick="clearWaveforms()">Clear</button>
 </div>
-<br/>
-<div class="datagrid" style="width:50%">
-    <table id="wave_table" border=1>
+
+<div class="panel presets">
+    <span class="label">Presets</span>
+    <button type="button" class="secondary small" onclick="loadPreset('sine')">Sine</button>
+    <button type="button" class="secondary small" onclick="loadPreset('saw')">Sawtooth</button>
+    <button type="button" class="secondary small" onclick="loadPreset('square')">Square</button>
+    <button type="button" class="secondary small" onclick="loadPreset('triangle')">Triangle</button>
+</div>
+
+<div class="panel">
+    <table id="wave_table">
         <thead>
         <tr>
             <th>Frequency Hz</th>
             <th>Amplitude</th>
-            <th>Phase</th>
+            <th>Phase (°)</th>
             <th>Note</th>
             <th>Enabled</th>
+            <th></th>
         </tr>
         </thead>
         <tbody>
         </tbody>
     </table>
+    <button type="button" class="secondary add-row" onclick="addRow()">+ Add Wave</button>
 </div>
-<button onclick="addRow()">Add Wave</button>
+</div>
 </body>
 </html>
-
