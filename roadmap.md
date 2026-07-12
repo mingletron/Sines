@@ -42,13 +42,13 @@ Prioritized roughly by impact vs. effort.
 
 ## 🖥️ UI/UX
 
-- [ ] **Keyboard shortcuts** — Space = Play/Stop, `+` = Add Wave, `Backspace` on selected row = Delete, `Ctrl+Z` = Undo.
-- [ ] **Collapsible panels** — The ADSR + MIDI + Presets + Wave Table sections are always visible. Add a small `▸`/`▾` toggle to each panel header to reclaim vertical space.
-- [ ] **Canvas resize handle** — The screens are fixed at 640×480. A drag-resize or dropdown (640, 800, 1024, full-width) would help on larger monitors.
-- [ ] **Full-screen scope mode** — Double-click a screen to expand it to fill the viewport (like a real scope's full-screen button).
-- [ ] **Screenshot / PNG export** — A 📷 button per screen that opens a download dialog with the current canvas contents.
-- [ ] **Tooltip help overlay** — A `?` button that shows a brief "How to use this synth" guide, especially helpful for the oscilloscope terminology.
-- [ ] **Wave row drag-to-reorder** — Use HTML drag-and-drop API so users can order harmonics meaningfully (e.g., fundamentals first).
+- [x] **Keyboard shortcuts** — Space = Play/Stop, `+` = Add Wave, `Backspace` = Delete last wave, `Escape` = close overlays. *(Done)*
+- [x] **Collapsible panels** — `▸`/`▾` toggle on Envelope, MIDI, Presets, and Waves panels. State persisted in localStorage. *(Done)*
+- [x] **Canvas resize handle** — Dropdown with 640×480, 800×600, 1024×768, and full-width options. *(Done)*
+- [x] **Full-screen scope mode** — Double-click a screen to expand it to fill the viewport. Escape to exit. *(Done)*
+- [x] **Screenshot / PNG export** — 📷 button per screen downloads canvas as PNG. *(Done)*
+- [x] **Tooltip help overlay** — `?` button shows a guide covering controls, keyboard shortcuts, and oscilloscope terminology. *(Done)*
+- [x] **Wave row drag-to-reorder** — HTML5 drag-and-drop with grip handle to reorder harmonics. *(Done)*
 
 ## 🎵 Musical Features
 
