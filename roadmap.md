@@ -62,7 +62,7 @@ Prioritized roughly by impact vs. effort.
 - [ ] **Web Worker for FFT** — The `computeSpectrum()` blocks the main thread for large FFT sizes. Moving it to a Worker would keep the UI smooth.
 - [ ] **Incremental buffer rebuild** — Currently `rebuildBuffer()` zeroes and re-sums all waves. For large wave tables, diffing enabled waves and only recomputing deltas would be faster.
 - [ ] **OfflineAudioContext for render** — Use `OfflineAudioContext` to pre-render the buffer instead of summing sample-by-sample in JS. Would be dramatically faster for complex patches.
-- [ ] **Add a test suite** — The CLAUDE.md notes "no test suite." Adding a small harness (even just `node` running the synthesis math) would prevent regressions.
+- [x] **Add a test suite** — Node.js test suite covering FFT, buffer synthesis, notes table, Wave class, presets, serialize/deserialize, and display toggles. Runs in CI on every PR. *(Done)*
 
 ## 🏆 Stretch Goals
 
