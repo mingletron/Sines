@@ -16,7 +16,8 @@ No build step, no package manager, no frameworks — just one `sines.html` you c
 
 ### Additive synthesis engine
 - Add any number of sine waves; each is summed into a single shared audio buffer.
-- Per-wave controls: **frequency** (direct Hz entry or a 108-note C0–B8 dropdown), **amplitude**, **phase**, **enable/disable**, and **remove**.
+- Per-wave controls: **frequency** (direct Hz entry or a 108-note C0–B8 dropdown), **amplitude**, **phase**, **detune** (±50¢ fine-tuning for chorus effects), **enable/disable**, and **remove**.
+- Switch any wave between **Sine** and **Noise** mode. Noise waves offer three colors: **white**, **pink** (perceptually flat), and **brown** (red spectrum).
 - Classic-waveform **presets** built additively from harmonics: Sine, Sawtooth (`1/n`), Square (odd harmonics, `1/n`), Triangle (odd harmonics, `1/n²`, alternating phase).
 
 ### Transport & master controls
@@ -55,6 +56,9 @@ The spectrum is a self-contained radix-2 Cooley–Tukey FFT (no library). It win
 | Note dropdown | Snap to an equal-temperament pitch (C0–B8) |
 | Amplitude | Per-wave level |
 | Phase (°) | Per-wave phase offset |
+| Detune (¢) | Fine-tune ±50 cents for chorus/thickening effects |
+| Type (SINE / NOISE) | Toggle between sine and noise generation per wave |
+| Noise Color | For noise-type waves: White, Pink, or Brown |
 | ON / OFF | Toggle a partial in and out of the mix |
 | ✕ | Remove a wave |
 | Gain | Master output level |
