@@ -232,6 +232,14 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     <button type="button" class="secondary small" id="stopBtn">■ Stop</button>
     <button type="button" class="secondary small" id="clearBtn">Clear</button>
     <button type="button" class="secondary small" id="xyBtn">XY</button>
+    <div class="spacer"></div>
+    <span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Display</span>
+    <span class="toggle" id="dbToggle">dB</span>
+    <span class="toggle" id="logFreqToggle">Log Freq</span>
+    <span class="toggle" id="trigRising" title="Rising edge trigger">Trig ▲</span>
+    <span class="toggle" id="trigFalling" title="Falling edge trigger">Trig ▼</span>
+    <span class="toggle" id="trigLevel" title="Level trigger">Trig ─</span>
+    <span class="toggle" id="cursorsToggle">Cursors</span>
 </div>
 
 <div class="panel">
@@ -286,6 +294,8 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     <button type="button" class="secondary small preset-btn" data-preset="saw">Sawtooth</button>
     <button type="button" class="secondary small preset-btn" data-preset="square">Square</button>
     <button type="button" class="secondary small preset-btn" data-preset="triangle">Triangle</button>
+    <button type="button" class="secondary small" id="savePresetBtn">Save…</button>
+    <div id="savedPresets" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;"></div>
 </div>
 
 <div class="panel">
@@ -466,6 +476,19 @@ let isNoteOn = false;
     let xyPhaseOffset = Math.PI / 2;
 
 const persistFrames = [];
+
+// Display options state
+let spectrumDbScale = false;
+let spectrumLogScale = false;
+let waterfallMode = false;
+let triggerMode = 'none';  // 'none', 'rising', 'falling', 'level'
+let triggerLevel = 0;
+let cursorsActive = false;
+let cursorV1 = null, cursorV2 = null;  // vertical cursor x-positions (pixels)
+let cursorH1 = null, cursorH2 = null;  // horizontal cursor y-positions (pixels)
+let cursorDrag = null;  // which cursor is being dragged
+let waterfallFrames = [];  // array of spectrum magnitude arrays for waterfall
+const MAX_WATERFALL = 128;
 
 // Spectrum (frequency-domain) cache + precomputed FFT tables.
 let spectrumDirty = true;
@@ -705,27 +728,61 @@ function drawPersistenceFrames(ctx, w, h) {
     });
 }
 
+let multiColor = false;
+const WAVE_COLORS = [
+    "#ff6464", "#64ffa0", "#6496ff", "#ffa064",
+    "#ff64f0", "#64fff0", "#f0ff64", "#a064ff"
+];
+
 function drawWaveform(ctx, w, h) {
     const cy = h / 2;
     const divY = h / 8;
     const currentFrame = new Array(w);
+    const trigOffset = findTriggerOffset();
+    const rate = getSampleRate();
 
-    // Dim trace (phosphor persistence)
+    if (multiColor && waves.some(function (ww) { return ww.enabled; })) {
+        // Draw each enabled wave as an independent coloured trace
+        waves.forEach(function (wave, idx) {
+            if (!wave.enabled) return;
+            ctx.beginPath();
+            let first = true;
+            const freq = parseFloat(wave.freq) * (midiRatio || 1);
+            for (let x = 0; x < w; ++x) {
+                const sample = Math.min(buf.length - 1, Math.round(x * zoom) + trigOffset);
+                const y = cy + Math.sin(freq * kPI_2 * sample / rate + wave.phase) * wave.amp * gain * -divY * 3.5;
+                if (first) { ctx.moveTo(x, y); first = false; }
+                else { ctx.lineTo(x, y); }
+            }
+            ctx.strokeStyle = WAVE_COLORS[idx % WAVE_COLORS.length];
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.65;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        });
+    }
+
+    // Composite trace (dim when multi-color is on, so coloured traces stand out)
     ctx.beginPath();
     let first = true;
     for (let x = 0; x < w; ++x) {
-        const sample = Math.min(buf.length - 1, Math.round(x * zoom));
+        const sample = Math.min(buf.length - 1, Math.round(x * zoom) + trigOffset);
         const y = cy + buf[sample] * gain * -divY * 3.5;
         currentFrame[x] = y;
         if (first) { ctx.moveTo(x, y); first = false; }
         else { ctx.lineTo(x, y); }
     }
-    ctx.strokeStyle = "#64ffa0";
-    ctx.lineWidth = 2;
+    if (multiColor) {
+        ctx.strokeStyle = "rgba(100, 255, 160, 0.25)";
+        ctx.lineWidth = 1;
+    } else {
+        ctx.strokeStyle = "#64ffa0";
+        ctx.lineWidth = 2;
+        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+        ctx.shadowBlur = 6;
+    }
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
-    ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
 
@@ -745,6 +802,19 @@ function drawWaveform(ctx, w, h) {
     if (persistFrames.length > MAX_PERSIST) persistFrames.shift();
 }
 
+function freqToX(freq, w) {
+    // Map frequency to x-pixel. Linear or log scale.
+    if (spectrumLogScale) {
+        const minFreq = 10;
+        const maxFreq = FREQ_MAX;
+        if (freq <= minFreq) return 0;
+        const logMin = Math.log10(minFreq);
+        const logMax = Math.log10(maxFreq);
+        return ((Math.log10(freq) - logMin) / (logMax - logMin)) * w;
+    }
+    return (freq / FREQ_MAX) * w;
+}
+
 function drawSpectrum(ctx, w, h) {
     const mags = computeSpectrum();
     if (!mags) return;
@@ -752,41 +822,149 @@ function drawSpectrum(ctx, w, h) {
     const binHz = rate / FFT_SIZE;
     const maxBin = Math.min(mags.length, Math.ceil(FREQ_MAX / binHz));
 
-    // Auto-normalize to the tallest visible peak so relative bar heights are preserved.
-    let maxMag = 0;
-    for (let i = 1; i < maxBin; i++) if (mags[i] > maxMag) maxMag = mags[i];
-    if (maxMag <= 0) return;
+    if (spectrumDbScale) {
+        // dB scale: compute 20*log10(mag/maxMag), clamp to -60dB range.
+        let maxMag = 0;
+        for (let i = 1; i < maxBin; i++) if (mags[i] > maxMag) maxMag = mags[i];
+        if (maxMag <= 0) return;
 
-    const baseY = h - 26;
-    const topY = 26;
-    const span = baseY - topY;
+        const baseY = h - 26;
+        const topY = 26;
+        const span = baseY - topY;
+        const dbRange = 60;  // -60 dB range
 
-    // Each x pixel maps to a frequency bin; drawn as a glowing vertical bar.
-    ctx.beginPath();
-    ctx.strokeStyle = "#64ffa0";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "butt";
-    ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
-    ctx.shadowBlur = 6;
-    for (let x = 0; x < w; x++) {
-        const freq = (x / w) * FREQ_MAX;
-        let bin = Math.round(freq / binHz);
-        if (bin < 1) bin = 1;
-        if (bin >= maxBin) continue;
-        const barH = (mags[bin] / maxMag) * span;
-        ctx.moveTo(x + 0.5, baseY);
-        ctx.lineTo(x + 0.5, baseY - barH);
+        // Draw spectrum bars
+        ctx.beginPath();
+        ctx.strokeStyle = "#64ffa0";
+        ctx.lineWidth = 2;
+        ctx.lineCap = "butt";
+        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+        ctx.shadowBlur = 6;
+
+        if (spectrumLogScale) {
+            // Log scale: draw filled area under curve
+            ctx.beginPath();
+            ctx.moveTo(freqToX(10, w) + 0.5, baseY);
+            for (let bin = 1; bin < maxBin; bin++) {
+                const freq = bin * binHz;
+                if (freq < 10) continue;
+                const ratio = mags[bin] / maxMag;
+                if (ratio <= 0) continue;
+                const db = 20 * Math.log10(ratio);
+                if (!isFinite(db)) continue;
+                const barH = (db / -dbRange) * span;
+                if (barH <= 0) continue;
+                const x = freqToX(freq, w);
+                if (x > w) break;
+                const y = baseY - barH;
+                ctx.lineTo(x + 0.5, y);
+            }
+            ctx.lineTo(w, baseY);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(100, 255, 160, 0.3)";
+            ctx.fill();
+            ctx.strokeStyle = "#64ffa0";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        } else {
+            for (let x = 0; x < w; x++) {
+                const freq = (x / w) * FREQ_MAX;
+                let bin = Math.round(freq / binHz);
+                if (bin < 1) bin = 1;
+                if (bin >= maxBin) continue;
+                const ratio = mags[bin] / maxMag;
+                if (ratio <= 0) continue;
+                const db = 20 * Math.log10(ratio);
+                const barH = (db / -dbRange) * span;
+                if (!isFinite(barH) || barH < 0) continue;
+                ctx.moveTo(x + 0.5, baseY);
+                ctx.lineTo(x + 0.5, baseY - barH);
+            }
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
+        // dB grid lines
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(100, 220, 140, 0.15)";
+        ctx.lineWidth = 1;
+        for (let db = -10; db >= -dbRange; db -= 10) {
+            const y = baseY - (db / -dbRange) * span;
+            ctx.moveTo(0, y + 0.5);
+            ctx.lineTo(w, y + 0.5);
+        }
+        ctx.stroke();
+
+        // Baseline
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(100, 220, 140, 0.25)";
+        ctx.lineWidth = 1;
+        ctx.moveTo(0, baseY + 0.5);
+        ctx.lineTo(w, baseY + 0.5);
+        ctx.stroke();
+
+    } else {
+        // Linear scale (original behavior)
+        let maxMag = 0;
+        for (let i = 1; i < maxBin; i++) if (mags[i] > maxMag) maxMag = mags[i];
+        if (maxMag <= 0) return;
+
+        const baseY = h - 26;
+        const topY = 26;
+        const span = baseY - topY;
+
+        ctx.beginPath();
+        ctx.strokeStyle = "#64ffa0";
+        ctx.lineWidth = 2;
+        ctx.lineCap = "butt";
+        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+        ctx.shadowBlur = 6;
+
+        if (spectrumLogScale) {
+            ctx.beginPath();
+            ctx.moveTo(freqToX(10, w) + 0.5, baseY);
+            for (let bin = 1; bin < maxBin; bin++) {
+                const freq = bin * binHz;
+                if (freq < 10) continue;
+                const x = freqToX(freq, w);
+                if (x > w) break;
+                const barH = (mags[bin] / maxMag) * span;
+                ctx.lineTo(x + 0.5, baseY - barH);
+            }
+            ctx.lineTo(w, baseY);
+            ctx.closePath();
+            ctx.fillStyle = "rgba(100, 255, 160, 0.3)";
+            ctx.fill();
+            ctx.strokeStyle = "#64ffa0";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        } else {
+            for (let x = 0; x < w; x++) {
+                const freq = (x / w) * FREQ_MAX;
+                let bin = Math.round(freq / binHz);
+                if (bin < 1) bin = 1;
+                if (bin >= maxBin) continue;
+                const barH = (mags[bin] / maxMag) * span;
+                ctx.moveTo(x + 0.5, baseY);
+                ctx.lineTo(x + 0.5, baseY - barH);
+            }
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
+        // Baseline
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(100, 220, 140, 0.25)";
+        ctx.lineWidth = 1;
+        ctx.moveTo(0, baseY + 0.5);
+        ctx.lineTo(w, baseY + 0.5);
+        ctx.stroke();
     }
-    ctx.stroke();
-    ctx.shadowBlur = 0;
 
-    // Baseline
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(100, 220, 140, 0.25)";
-    ctx.lineWidth = 1;
-    ctx.moveTo(0, baseY + 0.5);
-    ctx.lineTo(w, baseY + 0.5);
-    ctx.stroke();
+    // Draw waterfall if in waterfall mode (set via third screen or mode toggle)
+    if (waterfallMode && waterfallFrames.length > 0) {
+        drawWaterfallDisplay(ctx, w, h);
+    }
 }
 
 function drawXY(ctx, w, h) {
@@ -850,6 +1028,146 @@ function drawXY(ctx, w, h) {
     ctx.fillText("XY", w - 12, h - 10);
 }
 
+function drawWaterfallDisplay(ctx, w, h) {
+    // Waterfall spectrum: X=frequency, Y=time, color=magnitude
+    const baseY = h - 26;
+    const topY = 26;
+    const displayH = baseY - topY;
+    const frameH = Math.max(1, Math.floor(displayH / MAX_WATERFALL));
+
+    // Draw frequency axis labels at top
+    ctx.font = "9px 'SF Mono', monospace";
+    ctx.fillStyle = "rgba(120, 220, 160, 0.4)";
+    ctx.textAlign = "left";
+    const freqStep = FREQ_MAX / 4;
+    for (let f = 0; f <= FREQ_MAX; f += freqStep) {
+        const x = (f / FREQ_MAX) * w;
+        ctx.fillText(f >= 1000 ? `${f/1000}k` : `${f}`, x + 2, topY + 10);
+    }
+
+    if (waterfallFrames.length === 0) return;
+
+    // Find max magnitude for normalization
+    let maxMag = 0;
+    for (const frame of waterfallFrames) {
+        for (let i = 1; i < frame.length; i++) {
+            if (frame[i] > maxMag) maxMag = frame[i];
+        }
+    }
+    if (maxMag <= 0) return;
+
+    // Draw waterfall: oldest at top, newest at bottom
+    for (let i = 0; i < waterfallFrames.length; i++) {
+        const mags = waterfallFrames[i];
+        const y = baseY - (waterfallFrames.length - i) * frameH;
+        if (y < topY) continue;
+
+        for (let x = 0; x < w; x++) {
+            const freq = (x / w) * FREQ_MAX;
+            const bin = Math.round(freq / (getSampleRate() / FFT_SIZE));
+            if (bin < 1 || bin >= mags.length) continue;
+            const norm = mags[bin] / maxMag;
+            if (norm <= 0) continue;
+
+            // Color mapping: low=magenta, mid=cyan, high=green
+            const r = Math.round(norm < 0.5 ? norm * 512 : 255);
+            const g = Math.round(norm < 0.5 ? norm * 400 : (1 - norm) * 255 * 2);
+            const b = Math.round(norm < 0.3 ? 200 : norm > 0.7 ? (norm - 0.7) * 800 : 100);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, frameH);
+        }
+    }
+
+    // Time labels on the right
+    ctx.font = "9px 'SF Mono', monospace";
+    ctx.fillStyle = "rgba(120, 220, 160, 0.4)";
+    ctx.textAlign = "right";
+    ctx.fillText("NOW", w - 4, baseY - 8);
+    ctx.fillText(`${waterfallFrames.length} frames`, w - 4, topY + 20);
+}
+
+function drawCursors(ctx, w, h, mode) {
+    if (!cursorsActive) return;
+
+    const cy = h / 2;
+    const cx = w / 2;
+
+    if (mode === "wave") {
+        // Vertical cursors (time)
+        if (cursorV1 !== null) {
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255, 200, 100, 0.8)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.moveTo(cursorV1 + 0.5, 0);
+            ctx.lineTo(cursorV1 + 0.5, h);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Label
+            const sampleRate = getSampleRate();
+            const dt = Math.abs(cursorV2 !== null ? cursorV2 - cursorV1 : 0) * zoom / sampleRate * 1000;
+            ctx.font = "10px 'SF Mono', monospace";
+            ctx.fillStyle = "rgba(255, 200, 100, 0.9)";
+            ctx.textAlign = "left";
+            ctx.fillText(`ΔT: ${dt.toFixed(2)}ms`, cursorV1 + 4, 30);
+        }
+        if (cursorV2 !== null && cursorV2 !== cursorV1) {
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255, 200, 100, 0.8)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.moveTo(cursorV2 + 0.5, 0);
+            ctx.lineTo(cursorV2 + 0.5, h);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Horizontal cursors (voltage)
+        if (cursorH1 !== null) {
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(100, 200, 255, 0.8)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.moveTo(0, cursorH1 + 0.5);
+            ctx.lineTo(w, cursorH1 + 0.5);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        if (cursorH2 !== null && cursorH2 !== cursorH1) {
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(100, 200, 255, 0.8)";
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.moveTo(0, cursorH2 + 0.5);
+            ctx.lineTo(w, cursorH2 + 0.5);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Voltage delta
+            const divY = h / 8;
+            const dV = Math.abs(cursorH2 - cursorH1) / (divY * 3.5) * (1 / gain);
+            ctx.font = "10px 'SF Mono', monospace";
+            ctx.fillStyle = "rgba(100, 200, 255, 0.9)";
+            ctx.textAlign = "right";
+            ctx.fillText(`ΔV: ${dV.toFixed(2)}V`, w - 12, cursorH2 - 4);
+        }
+    }
+}
+
+function findTriggerOffset() {
+    // Find trigger point in buffer based on triggerMode and triggerLevel
+    if (triggerMode === 'none' || !buf || buf.length < 2) return 0;
+
+    const len = buf.length;
+    for (let i = 1; i < len; i++) {
+        if (triggerMode === 'rising' && buf[i-1] < triggerLevel && buf[i] >= triggerLevel) return i;
+        if (triggerMode === 'falling' && buf[i-1] > triggerLevel && buf[i] <= triggerLevel) return i;
+        if (triggerMode === 'level' && Math.abs(buf[i] - triggerLevel) < 0.01) return i;
+    }
+    return 0;
+}
+
 function drawScanlines(ctx, w, h) {
     ctx.beginPath();
     ctx.strokeStyle = "rgba(0, 40, 0, 0.12)";
@@ -891,7 +1209,9 @@ function drawReadouts(ctx, w, h, mode) {
         ctx.textAlign = "left";
         ctx.fillText(`FFT ${FFT_SIZE}`, 12, h - 10);
         ctx.textAlign = "right";
-        ctx.fillText("LIN", w - 12, h - 10);
+        const scaleLabel = spectrumDbScale ? "dB" : "LIN";
+        const freqLabel = spectrumLogScale ? "LOG" : "LIN";
+        ctx.fillText(`${scaleLabel} ${freqLabel}`, w - 12, h - 10);
         return;
     }
 
@@ -905,10 +1225,11 @@ function drawReadouts(ctx, w, h, mode) {
     ctx.textAlign = "left";
     ctx.fillText("COUPLING DC", 12, h - 10);
     ctx.textAlign = "right";
-    ctx.fillText("TRIG AUTO", w - 12, h - 10);
+    const trigLabel = triggerMode === 'none' ? "TRIG AUTO" : `TRIG ${triggerMode.toUpperCase()}`;
+    ctx.fillText(trigLabel, w - 12, h - 10);
 }
 
-// Paints one CRT screen: background → graticule → content → scanlines → bezel → readouts.
+// Paints one CRT screen: background → graticule → content → cursors → scanlines → bezel → readouts.
 // `content` draws the screen-specific trace between the graticule and the scanlines.
 function paintScope(canvas, content) {
     canvas.width = canvas.width; // clear
@@ -920,6 +1241,7 @@ function paintScope(canvas, content) {
     drawBackground(ctx, w, h);
     drawGraticule(ctx, w, h);
     content(ctx, w, h);
+    drawCursors(ctx, w, h, mode);
     drawScanlines(ctx, w, h);
     drawBezel(ctx, w, h);
     drawReadouts(ctx, w, h, mode);
@@ -944,6 +1266,14 @@ function draw(showWave) {
             if (buf && buf.length > 0) {
                 if (xyMode) {
                     drawXY(ctx, w, h);
+                } else if (waterfallMode) {
+                    // Capture current spectrum for waterfall
+                    const mags = computeSpectrum();
+                    if (mags) {
+                        waterfallFrames.push(new Float32Array(mags));
+                        if (waterfallFrames.length > MAX_WATERFALL) waterfallFrames.shift();
+                    }
+                    drawWaterfallDisplay(ctx, w, h);
                 } else {
                     drawSpectrum(ctx, w, h);
                 }
@@ -1349,6 +1679,108 @@ function loadPreset(shape) {
 }
 
 // ============================================================
+// Custom preset storage (localStorage)
+// ============================================================
+const PRESET_STORE_KEY = "sines-presets";
+
+function getSavedPresets() {
+    try {
+        return JSON.parse(localStorage.getItem(PRESET_STORE_KEY)) || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function persistPresets(store) {
+    try {
+        localStorage.setItem(PRESET_STORE_KEY, JSON.stringify(store));
+    } catch (e) {
+        alert("Could not save preset: storage full or unavailable.");
+    }
+}
+
+function serializeState() {
+    return {
+        waves: waves.map(function (w) { return { freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled }; }),
+        gain: gain,
+        zoom: zoom,
+        attack: attack,
+        decay: decay,
+        sustain: sustain,
+        release: release,
+        looping: looping,
+    };
+}
+
+function deserializeState(state) {
+    clearWaveforms();
+    gain = state.gain;
+    zoom = state.zoom;
+    attack = state.attack;
+    decay = state.decay;
+    sustain = state.sustain;
+    release = state.release;
+    looping = state.looping;
+
+    document.getElementById("gainSlider").value = Math.round(gain * 100);
+    document.getElementById("gainReadout").textContent = Math.round(gain * 100);
+    document.getElementById("zoomSlider").value = Math.round(zoom * 100);
+    document.getElementById("zoomReadout").textContent = zoom.toFixed(2) + "x";
+    document.getElementById("attackSlider").value = Math.round(attack * 1000);
+    document.getElementById("attackReadout").textContent = Math.round(attack * 1000) + "ms";
+    document.getElementById("decaySlider").value = Math.round(decay * 1000);
+    document.getElementById("decayReadout").textContent = Math.round(decay * 1000) + "ms";
+    document.getElementById("sustainSlider").value = Math.round(sustain * 100);
+    document.getElementById("sustainReadout").textContent = sustain.toFixed(2);
+    document.getElementById("releaseSlider").value = Math.round(release * 1000);
+    document.getElementById("releaseReadout").textContent = Math.round(release * 1000) + "ms";
+    document.getElementById("loopToggle").checked = looping;
+
+    if (state.waves) {
+        for (const w of state.waves) {
+            addRow({ freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled });
+        }
+    }
+    rebuildBuffer();
+}
+
+function refreshSavedPresetsUI() {
+    const container = document.getElementById("savedPresets");
+    if (!container) return;
+    container.innerHTML = "";
+    const store = getSavedPresets();
+    const names = Object.keys(store);
+    if (names.length === 0) {
+        container.style.display = "none";
+        return;
+    }
+    container.style.display = "flex";
+    for (const name of names) {
+        const pill = document.createElement("span");
+        pill.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;border-radius:999px;color:var(--accent);background:rgba(74,222,128,0.12);border:1px solid var(--accent-dim);cursor:pointer;";
+        const label = document.createElement("span");
+        label.textContent = name;
+        label.addEventListener("click", function () {
+            const st = getSavedPresets()[name];
+            if (st) deserializeState(st);
+        });
+        const x = document.createElement("span");
+        x.textContent = "✕";
+        x.style.cssText = "font-size:10px;color:var(--muted);cursor:pointer;";
+        x.addEventListener("click", function (e) {
+            e.stopPropagation();
+            const store = getSavedPresets();
+            delete store[name];
+            persistPresets(store);
+            refreshSavedPresetsUI();
+        });
+        pill.appendChild(label);
+        pill.appendChild(x);
+        container.appendChild(pill);
+    }
+}
+
+// ============================================================
 // DOM initialization
 // ============================================================
 document.getElementById("gainSlider").addEventListener("input", function () {
@@ -1394,6 +1826,171 @@ document.querySelectorAll(".preset-btn").forEach(function (btn) {
         loadPreset(this.dataset.preset);
     });
 });
+
+// Custom preset save/load
+document.getElementById("savePresetBtn").addEventListener("click", function () {
+    const name = prompt("Save preset as:");
+    if (!name || !name.trim()) return;
+    const store = getSavedPresets();
+    store[name.trim()] = serializeState();
+    persistPresets(store);
+    refreshSavedPresetsUI();
+});
+
+// Display options
+document.getElementById("dbToggle").addEventListener("click", function () {
+    spectrumDbScale = !spectrumDbScale;
+    this.classList.toggle("on");
+    draw(true);
+});
+document.getElementById("logFreqToggle").addEventListener("click", function () {
+    spectrumLogScale = !spectrumLogScale;
+    this.classList.toggle("on");
+    draw(true);
+});
+
+// Trigger mode toggles (mutually exclusive)
+function setTriggerMode(mode) {
+    triggerMode = mode;
+    document.getElementById("trigRising").classList.toggle("on", mode === 'rising');
+    document.getElementById("trigFalling").classList.toggle("on", mode === 'falling');
+    document.getElementById("trigLevel").classList.toggle("on", mode === 'level');
+    draw(true);
+}
+document.getElementById("trigRising").addEventListener("click", function () {
+    setTriggerMode(triggerMode === 'rising' ? 'none' : 'rising');
+});
+document.getElementById("trigFalling").addEventListener("click", function () {
+    setTriggerMode(triggerMode === 'falling' ? 'none' : 'falling');
+});
+document.getElementById("trigLevel").addEventListener("click", function () {
+    setTriggerMode(triggerMode === 'level' ? 'none' : 'level');
+});
+
+// Cursor toggle and interaction
+document.getElementById("cursorsToggle").addEventListener("click", function () {
+    cursorsActive = !cursorsActive;
+    this.classList.toggle("on");
+    if (!cursorsActive) {
+        cursorV1 = cursorV2 = cursorH1 = cursorH2 = null;
+    }
+    draw(true);
+});
+
+// Canvas cursor interaction
+function setupCursorInteraction(canvas) {
+    let dragTarget = null;
+
+    function getCanvasPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    function findNearestCursor(pos) {
+        const threshold = 10;
+        let minDist = threshold;
+        let target = null;
+
+        if (cursorV1 !== null) {
+            const d = Math.abs(pos.x - cursorV1);
+            if (d < minDist) { minDist = d; target = 'v1'; }
+        }
+        if (cursorV2 !== null) {
+            const d = Math.abs(pos.x - cursorV2);
+            if (d < minDist) { minDist = d; target = 'v2'; }
+        }
+        if (cursorH1 !== null) {
+            const d = Math.abs(pos.y - cursorH1);
+            if (d < minDist) { minDist = d; target = 'h1'; }
+        }
+        if (cursorH2 !== null) {
+            const d = Math.abs(pos.y - cursorH2);
+            if (d < minDist) { minDist = d; target = 'h2'; }
+        }
+        return target;
+    }
+
+    canvas.addEventListener("mousedown", function (e) {
+        if (!cursorsActive) return;
+        const pos = getCanvasPos(e);
+
+        // Check if clicking near an existing cursor to drag
+        dragTarget = findNearestCursor(pos);
+
+        if (!dragTarget) {
+            // Place new cursor based on which ones are already set
+            if (cursorV1 === null) {
+                cursorV1 = pos.x;
+            } else if (cursorV2 === null) {
+                cursorV2 = pos.x;
+            } else if (cursorH1 === null) {
+                cursorH1 = pos.y;
+            } else if (cursorH2 === null) {
+                cursorH2 = pos.y;
+            } else {
+                // All cursors placed, reset
+                cursorV1 = pos.x;
+                cursorV2 = cursorH1 = cursorH2 = null;
+            }
+        }
+
+        draw(true);
+    });
+
+    canvas.addEventListener("mousemove", function (e) {
+        if (!cursorsActive || !dragTarget) return;
+        const pos = getCanvasPos(e);
+
+        if (dragTarget === 'v1') cursorV1 = pos.x;
+        else if (dragTarget === 'v2') cursorV2 = pos.x;
+        else if (dragTarget === 'h1') cursorH1 = pos.y;
+        else if (dragTarget === 'h2') cursorH2 = pos.y;
+
+        draw(true);
+    });
+
+    canvas.addEventListener("mouseup", function () {
+        dragTarget = null;
+    });
+
+    canvas.addEventListener("mouseleave", function () {
+        dragTarget = null;
+    });
+}
+
+setupCursorInteraction(document.getElementById("waveCanvas"));
+setupCursorInteraction(document.getElementById("specCanvas"));
+
+// Multi-color toggle (add button to controls)
+const multiColorBtn = document.createElement("button");
+multiColorBtn.type = "button";
+multiColorBtn.className = "secondary small";
+multiColorBtn.textContent = "RGB";
+multiColorBtn.title = "Multi-color wave traces";
+multiColorBtn.addEventListener("click", function () {
+    multiColor = !multiColor;
+    this.classList.toggle("on");
+    draw(true);
+});
+document.getElementById("controls").querySelector(".spacer").before(multiColorBtn);
+
+// Waterfall mode toggle for spectrum
+const waterfallBtn = document.createElement("button");
+waterfallBtn.type = "button";
+waterfallBtn.className = "secondary small";
+waterfallBtn.textContent = "Waterfall";
+waterfallBtn.title = "Waterfall spectrum display";
+waterfallBtn.addEventListener("click", function () {
+    waterfallMode = !waterfallMode;
+    this.classList.toggle("on", waterfallMode);
+    if (waterfallMode) {
+        waterfallFrames = [];
+    }
+    draw(true);
+});
+document.getElementById("controls").querySelector(".spacer").before(waterfallBtn);
+
+refreshSavedPresetsUI();
 
 initMIDI();
 
