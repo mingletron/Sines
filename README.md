@@ -6,7 +6,7 @@ No build step, no package manager, no frameworks — just one `sines.html` you c
 
 ## Screenshot
 
-![Sines oscilloscope screenshot](SCR-20260711-opkt.jpg)
+![Sines oscilloscope screenshot](SCR-20260712-kwtr.jpg)
 
 ## Features
 
