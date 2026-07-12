@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Sines is a single-file, zero-dependency browser experiment for additive synthesis: it builds an audio buffer by summing sine waves and renders it on two side-by-side CRT-style `<canvas>` screens — one showing the time-domain waveform, the other a frequency-domain spectrum analyzer. All code lives in `sines.html` (inline `<style>` + one `<script>` block). There is no build step, package manager, or test suite.
+Sines is a single-file, zero-dependency browser experiment for additive synthesis: it builds an audio buffer by summing sine waves and renders it on two side-by-side CRT-style `<canvas>` screens — one showing the time-domain waveform, the other a frequency-domain spectrum analyzer. All code lives in `sines.html` (inline `<style>` + one `<script>` block). There is no build step or package manager. A Node.js test suite (`test.js`) covers the core synthesis, FFT, and state management logic.
 
 ## Running
 
 Open `sines.html` directly in a browser, or serve it (e.g. `python3 -m http.server`) and visit the page. Audio requires a Web Audio-capable browser. `window.AudioContext || window.webkitAudioContext` handles the Safari prefix.
 
-The `AudioContext` is created/resumed lazily on the first call that needs audio (via `ensureAudioContext()`), so audio starts from a user gesture as modern browsers require. There is no build step, package manager, or test suite; validate JS by parsing the `<script>` block with `node -e 'new Function(require("fs").readFileSync("sines.html","utf-8").match(/<script>([\\s\\S]*?)<\\/script>/)[1])'`.
+The `AudioContext` is created/resumed lazily on the first call that needs audio (via `ensureAudioContext()`), so audio starts from a user gesture as modern browsers require. There is no build step or package manager. Run the test suite with `node test.js`. To validate that the JS parses: `node -e 'new Function(require("fs").readFileSync("sines.html","utf-8").match(/<script>([\\s\\S]*?)<\\/script>/)[1])'`.
 
 ## Code organization
 

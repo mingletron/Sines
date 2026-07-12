@@ -62,9 +62,17 @@ The spectrum is a self-contained radix-2 Cooley–Tukey FFT (no library). It win
 | Loop | Loop the 2-second buffer |
 | Play / Stop | Transport |
 
-## Validation
+## Testing
 
-There's no test suite. To sanity-check that the JavaScript parses:
+Run the test suite (Node.js, no dependencies):
+
+```bash
+node test.js
+```
+
+Tests cover: FFT correctness, buffer synthesis, note frequency table, Wave model, presets, serialize/deserialize, display toggles, and more. CI runs these automatically on every pull request via GitHub Actions.
+
+To sanity-check that the JavaScript parses:
 
 ```bash
 node -e 'new Function(require("fs").readFileSync("sines.html","utf-8").match(/<script>([\s\S]*?)<\/script>/)[1])'
@@ -79,7 +87,9 @@ Modern Chromium, Firefox, and Safari. Audio requires a Web Audio-capable browser
 ## Project layout
 
 ```
-sines.html   # the entire app: inline <style> + one <script> block
-CLAUDE.md    # architecture notes and editing invariants for AI assistants
-README.md    # this file
+sines.html                        # the entire app: inline <style> + one <script> block
+test.js                           # test suite (Node.js, no dependencies)
+.github/workflows/test.yml       # CI: runs tests on PRs and pushes to master
+CLAUDE.md                         # architecture notes and editing invariants for AI assistants
+README.md                         # this file
 ```
