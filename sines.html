@@ -286,6 +286,8 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     <button type="button" class="secondary small preset-btn" data-preset="saw">Sawtooth</button>
     <button type="button" class="secondary small preset-btn" data-preset="square">Square</button>
     <button type="button" class="secondary small preset-btn" data-preset="triangle">Triangle</button>
+    <button type="button" class="secondary small" id="savePresetBtn">Save…</button>
+    <div id="savedPresets" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;"></div>
 </div>
 
 <div class="panel">
@@ -1349,6 +1351,108 @@ function loadPreset(shape) {
 }
 
 // ============================================================
+// Custom preset storage (localStorage)
+// ============================================================
+const PRESET_STORE_KEY = "sines-presets";
+
+function getSavedPresets() {
+    try {
+        return JSON.parse(localStorage.getItem(PRESET_STORE_KEY)) || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function persistPresets(store) {
+    try {
+        localStorage.setItem(PRESET_STORE_KEY, JSON.stringify(store));
+    } catch (e) {
+        alert("Could not save preset: storage full or unavailable.");
+    }
+}
+
+function serializeState() {
+    return {
+        waves: waves.map(function (w) { return { freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled }; }),
+        gain: gain,
+        zoom: zoom,
+        attack: attack,
+        decay: decay,
+        sustain: sustain,
+        release: release,
+        looping: looping,
+    };
+}
+
+function deserializeState(state) {
+    clearWaveforms();
+    gain = state.gain;
+    zoom = state.zoom;
+    attack = state.attack;
+    decay = state.decay;
+    sustain = state.sustain;
+    release = state.release;
+    looping = state.looping;
+
+    document.getElementById("gainSlider").value = Math.round(gain * 100);
+    document.getElementById("gainReadout").textContent = Math.round(gain * 100);
+    document.getElementById("zoomSlider").value = Math.round(zoom * 100);
+    document.getElementById("zoomReadout").textContent = zoom.toFixed(2) + "x";
+    document.getElementById("attackSlider").value = Math.round(attack * 1000);
+    document.getElementById("attackReadout").textContent = Math.round(attack * 1000) + "ms";
+    document.getElementById("decaySlider").value = Math.round(decay * 1000);
+    document.getElementById("decayReadout").textContent = Math.round(decay * 1000) + "ms";
+    document.getElementById("sustainSlider").value = Math.round(sustain * 100);
+    document.getElementById("sustainReadout").textContent = sustain.toFixed(2);
+    document.getElementById("releaseSlider").value = Math.round(release * 1000);
+    document.getElementById("releaseReadout").textContent = Math.round(release * 1000) + "ms";
+    document.getElementById("loopToggle").checked = looping;
+
+    if (state.waves) {
+        for (const w of state.waves) {
+            addRow({ freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled });
+        }
+    }
+    rebuildBuffer();
+}
+
+function refreshSavedPresetsUI() {
+    const container = document.getElementById("savedPresets");
+    if (!container) return;
+    container.innerHTML = "";
+    const store = getSavedPresets();
+    const names = Object.keys(store);
+    if (names.length === 0) {
+        container.style.display = "none";
+        return;
+    }
+    container.style.display = "flex";
+    for (const name of names) {
+        const pill = document.createElement("span");
+        pill.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;border-radius:999px;color:var(--accent);background:rgba(74,222,128,0.12);border:1px solid var(--accent-dim);cursor:pointer;";
+        const label = document.createElement("span");
+        label.textContent = name;
+        label.addEventListener("click", function () {
+            const st = getSavedPresets()[name];
+            if (st) deserializeState(st);
+        });
+        const x = document.createElement("span");
+        x.textContent = "✕";
+        x.style.cssText = "font-size:10px;color:var(--muted);cursor:pointer;";
+        x.addEventListener("click", function (e) {
+            e.stopPropagation();
+            const store = getSavedPresets();
+            delete store[name];
+            persistPresets(store);
+            refreshSavedPresetsUI();
+        });
+        pill.appendChild(label);
+        pill.appendChild(x);
+        container.appendChild(pill);
+    }
+}
+
+// ============================================================
 // DOM initialization
 // ============================================================
 document.getElementById("gainSlider").addEventListener("input", function () {
@@ -1394,6 +1498,18 @@ document.querySelectorAll(".preset-btn").forEach(function (btn) {
         loadPreset(this.dataset.preset);
     });
 });
+
+// Custom preset save/load
+document.getElementById("savePresetBtn").addEventListener("click", function () {
+    const name = prompt("Save preset as:");
+    if (!name || !name.trim()) return;
+    const store = getSavedPresets();
+    store[name.trim()] = serializeState();
+    persistPresets(store);
+    refreshSavedPresetsUI();
+});
+
+refreshSavedPresetsUI();
 
 initMIDI();
 
