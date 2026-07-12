@@ -75,7 +75,7 @@ function createStubEnvironment() {
         'trigFalling', 'trigLevel', 'cursorsToggle', 'waveCanvas', 'specCanvas',
         'powerLed', 'midiDevice', 'midiStatus', 'midiNoteDisplay',
         'gainReadout', 'zoomReadout', 'controls', 'savedPresets',
-        'waveScreen', 'specScreen', 'canvasSize', 'helpOverlay', 'helpBtn', 'helpClose',
+        'waveScreen', 'specScreen', 'canvasSize', 'themeSelect', 'helpOverlay', 'helpBtn', 'helpClose',
     ];
     for (const id of ids) elements[id] = makeProxy(id);
 
