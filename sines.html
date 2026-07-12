@@ -14,15 +14,28 @@
     --muted: #6a8a6a;
     --accent: #4aff8a;
     --accent-dim: #2ac86a;
+    --danger: #ff7676;
     --radius: 14px;
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    --body-grad: #081208;
+    --led-on: #0f0; --led-off: #1a0; --led-border: #060;
+    --led-glow: #0f0; --led-ring: #0d1a0d; --led-inset: #020; --led-outer: #0a0;
+    --bezel-border: #0d1a0d; --bezel-outer: #0a150a; --bezel-mid: #142814;
+    --screen-bg: #040806; --canvas-bg: #020602;
+    --glow-rgba: rgba(80,200,120,0.02);
+    --glow-rgba-2: rgba(80,200,120,0.05);
+    --glow-rgba-3: rgba(80,200,120,0.03);
+    --glow-rgba-10: rgba(80,200,120,0.1);
+    --accent-rgba-15: rgba(100,255,160,0.15);
+    --accent-rgba-18: rgba(100,255,160,0.18);
+    --slider-glow: rgba(74,222,128,0.15);
 }
 * { box-sizing: border-box; }
 body {
     margin: 0;
     min-height: 100vh;
     padding: 30px 20px 60px;
-    background: radial-gradient(1200px 600px at 50% -10%, #081208, var(--bg));
+    background: radial-gradient(1200px 600px at 50% -10%, var(--body-grad), var(--bg));
     color: var(--text);
     font: 400 14px/1.5 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
 }
@@ -33,18 +46,18 @@ header {
 header .brand { display: flex; align-items: center; gap: 10px; }
 #powerLed {
     width: 12px; height: 12px; border-radius: 50%;
-    background: #1a0; border: 2px solid #060;
-    box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 8px #0a0;
+    background: var(--led-off); border: 2px solid var(--led-border);
+    box-shadow: 0 0 0 2px var(--led-ring), inset 0 0 4px var(--led-inset), 0 0 8px var(--led-outer);
     transition: all 0.3s ease;
 }
 #powerLed.on {
-    background: #0f0; border-color: #0a0;
-    box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 18px #0f0, 0 0 36px #0f0;
+    background: var(--led-on); border-color: var(--led-outer);
+    box-shadow: 0 0 0 2px var(--led-ring), inset 0 0 4px var(--led-inset), 0 0 18px var(--led-glow), 0 0 36px var(--led-glow);
     animation: pulse 1.2s ease-in-out infinite;
 }
 @keyframes pulse {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 18px #0f0, 0 0 36px #0f0; }
-    50% { opacity: 0.7; box-shadow: 0 0 0 2px #0d1a0d, inset 0 0 4px #020, 0 0 12px #0f0, 0 0 24px #0f0; }
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 2px var(--led-ring), inset 0 0 4px var(--led-inset), 0 0 18px var(--led-glow), 0 0 36px var(--led-glow); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 2px var(--led-ring), inset 0 0 4px var(--led-inset), 0 0 12px var(--led-glow), 0 0 24px var(--led-glow); }
 }
 header h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.02em; color: var(--accent); }
 header .sub { color: var(--muted); font-size: 12px; font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; }
@@ -52,15 +65,15 @@ header .sub { color: var(--muted); font-size: 12px; font-weight: 400; letter-spa
 .screen {
     position: relative;
     padding: 16px;
-    background: #040806;
-    border: 3px solid #0d1a0d;
+    background: var(--screen-bg);
+    border: 3px solid var(--bezel-border);
     border-radius: 18px;
     box-shadow:
-        0 0 0 2px #0a150a,
-        0 0 0 4px #142814,
+        0 0 0 2px var(--bezel-outer),
+        0 0 0 4px var(--bezel-mid),
         0 20px 60px rgba(0, 0, 0, 0.8),
-        inset 0 0 120px rgba(80, 200, 120, 0.02),
-        inset 0 0 0 1px rgba(80, 200, 120, 0.05);
+        inset 0 0 120px var(--glow-rgba),
+        inset 0 0 0 1px var(--glow-rgba-2);
     overflow: hidden;
 }
 .screen::before {
@@ -75,9 +88,9 @@ header .sub { color: var(--muted); font-size: 12px; font-weight: 400; letter-spa
     content: "";
     position: absolute; inset: 14px; pointer-events: none; border-radius: 10px; z-index: 11;
     box-shadow:
-        inset 0 0 0 1px rgba(80, 200, 120, 0.1),
-        inset 0 0 80px rgba(80, 200, 120, 0.03),
-        inset 0 -40px 60px rgba(80, 200, 120, 0.02);
+        inset 0 0 0 1px var(--glow-rgba-10),
+        inset 0 0 80px var(--glow-rgba-3),
+        inset 0 -40px 60px var(--glow-rgba);
 }
 .screens { display: flex; gap: 16px; flex-wrap: wrap; }
 .screens > .screen { flex: 1 1 460px; min-width: 0; margin: 0; }
@@ -85,11 +98,11 @@ header .sub { color: var(--muted); font-size: 12px; font-weight: 400; letter-spa
     position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
     z-index: 12; pointer-events: none;
     font-size: 10px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase;
-    color: rgba(120, 220, 160, 0.45);
+    color: var(--muted);
 }
 .scope-canvas {
     display: block; width: 100%; height: auto; border-radius: 6px;
-    background: #020602;
+    background: var(--canvas-bg);
 }
 
 .panel {
@@ -130,7 +143,7 @@ button.ghost {
     border: 1px solid var(--border); box-shadow: none;
     padding: 5px 11px; font-size: 12px; line-height: 1;
 }
-button.ghost:hover { color: #ff7676; border-color: #ff7676; filter: none; }
+button.ghost:hover { color: var(--danger); border-color: var(--danger); filter: none; }
 
 input[type=range] {
     -webkit-appearance: none; appearance: none;
@@ -142,11 +155,11 @@ input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
     width: 16px; height: 16px; border-radius: 50%;
     background: var(--accent); border: 2px solid #06210f;
-    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+    box-shadow: 0 0 0 3px var(--accent-rgba-18);
 }
 input[type=range]::-moz-range-thumb {
     width: 16px; height: 16px; border-radius: 50%;
-    background: var(--accent); border: 2px solid #06210f;
+    background: var(--accent); border: 2px solid var(--bg);
 }
 
 input[type=text], select {
@@ -158,7 +171,7 @@ input[type=text], select {
 select { width: auto; }
 input[type=text]:focus, select:focus, input[type=range]:focus-visible {
     outline: none; border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15);
+    box-shadow: 0 0 0 3px var(--slider-glow);
 }
 
 table { width: 100%; border-collapse: collapse; margin-top: 4px; }
@@ -179,7 +192,7 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     color: var(--muted); background: var(--panel-2); border: 1px solid var(--border);
     transition: color .15s ease, background .15s ease, border-color .15s ease;
 }
-.toggle.on { color: var(--accent); background: rgba(74, 222, 128, 0.15); border-color: var(--accent-dim); }
+.toggle.on { color: var(--accent); background: var(--accent-rgba-15); border-color: var(--accent-dim); }
 
 .add-row { margin-top: 16px; }
 
@@ -190,8 +203,8 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
 .screenshot-btn {
     position: absolute; top: 8px; right: 8px; z-index: 12;
     padding: 4px 8px; font-size: 14px; line-height: 1;
-    background: rgba(0,0,0,0.5); color: rgba(120,220,160,0.6);
-    border: 1px solid rgba(120,220,160,0.2); border-radius: 6px;
+    background: rgba(0,0,0,0.5); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
     cursor: pointer; transition: color .15s, border-color .15s, background .15s;
 }
 .screenshot-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(0,0,0,0.7); }
@@ -259,7 +272,7 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     background: rgba(0,0,0,0.6); color: var(--muted);
     border: 1px solid var(--border); border-radius: 8px;
 }
-.help-close:hover { color: #ff7676; border-color: #ff7676; }
+.help-close:hover { color: var(--danger); border-color: var(--danger); }
 
 /* Drag-to-reorder */
 tbody tr.dragging { opacity: 0.3; }
@@ -290,6 +303,13 @@ tbody tr.drag-over-bottom { border-bottom: 2px solid var(--accent); }
         <option value="800x600">800 × 600</option>
         <option value="1024x768">1024 × 768</option>
         <option value="full">Full width</option>
+    </select>
+    <label for="themeSelect" style="margin-left:12px;">Theme</label>
+    <select id="themeSelect">
+        <option value="green">Green CRT</option>
+        <option value="amber">Amber CRT</option>
+        <option value="blue">Blue CRT</option>
+        <option value="white">White</option>
     </select>
 </div>
 <div class="screens">
@@ -464,6 +484,7 @@ tbody tr.drag-over-bottom { border-bottom: 2px solid var(--accent); }
 <tr><td>XY</td><td>Show Lissajous figure instead of spectrum</td></tr>
 <tr><td>RGB</td><td>Draw each harmonic in a distinct colour</td></tr>
 <tr><td>Waterfall</td><td>Rolling waterfall display of spectrum over time</td></tr>
+<tr><td>Theme</td><td>Switch colour theme: Green CRT, Amber CRT, Blue CRT, or White</td></tr>
 </table>
 
 <h3>Oscilloscope Terminology</h3>
@@ -602,6 +623,135 @@ const notes = [
     { note: "A#8/Bb8", freq: "7458.62" },
     { note: "B8", freq: "7902.13" },
 ];
+
+// ============================================================
+// Colour themes
+// ============================================================
+// Helper: build rgba string from [r,g,b] array + alpha
+function rgba(arr, a) { return `rgba(${arr[0]},${arr[1]},${arr[2]},${a})`; }
+
+const THEMES = {
+    green: {
+        name: "Green CRT",
+        css: {
+            "--bg": "#040806", "--panel": "#0a150a", "--panel-2": "#0f1a0f",
+            "--border": "#1a351a", "--text": "#c8e8c8", "--muted": "#6a8a6a",
+            "--accent": "#4aff8a", "--accent-dim": "#2ac86a", "--danger": "#ff7676",
+            "--body-grad": "#081208",
+            "--led-on": "#0f0", "--led-off": "#1a0", "--led-border": "#060",
+            "--led-glow": "#0f0", "--led-ring": "#0d1a0d", "--led-inset": "#020", "--led-outer": "#0a0",
+            "--bezel-border": "#0d1a0d", "--bezel-outer": "#0a150a", "--bezel-mid": "#142814",
+            "--screen-bg": "#040806", "--canvas-bg": "#020602",
+        },
+        canvas: {
+            bgGrad: ["#0a140a", "#060f06", "#020802"],
+            trace: "#64ffa0", traceGlow: [100, 255, 160], traceBright: [200, 255, 220],
+            gridDim: [80, 200, 100], gridBright: [100, 220, 140], gridAccent: [100, 255, 160],
+            label: [120, 220, 160], readout: [120, 220, 160],
+            markerOrange: [255, 200, 100], markerBlue: [100, 200, 255],
+            waveColors: ["#ff6464","#64ffa0","#6496ff","#ffa064","#ff64f0","#64fff0","#f0ff64","#a064ff"],
+            spectrumLow: [200, 0, 255], spectrumMid: [0, 200, 255], spectrumHigh: [100, 255, 160],
+            waterfallGrid: [0, 40, 0], waterfallAxis: [40, 80, 40],
+        },
+    },
+    amber: {
+        name: "Amber CRT",
+        css: {
+            "--bg": "#0a0804", "--panel": "#150f0a", "--panel-2": "#1a140f",
+            "--border": "#352a1a", "--text": "#e8d8c8", "--muted": "#8a7a6a",
+            "--accent": "#ffb84a", "--accent-dim": "#c8962a", "--danger": "#ff7676",
+            "--body-grad": "#120a04",
+            "--led-on": "#ff0", "--led-off": "#a60", "--led-border": "#640",
+            "--led-glow": "#ff0", "--led-ring": "#1a0d0d", "--led-inset": "#200", "--led-outer": "#a60",
+            "--bezel-border": "#1a0d0d", "--bezel-outer": "#150f0a", "--bezel-mid": "#281414",
+            "--screen-bg": "#080602", "--canvas-bg": "#060402",
+        },
+        canvas: {
+            bgGrad: ["#140a0a", "#0f0606", "#080202"],
+            trace: "#ffcc66", traceGlow: [255, 200, 100], traceBright: [255, 240, 200],
+            gridDim: [200, 160, 80], gridBright: [220, 180, 100], gridAccent: [255, 200, 100],
+            label: [220, 180, 120], readout: [220, 180, 120],
+            markerOrange: [255, 200, 100], markerBlue: [100, 200, 255],
+            waveColors: ["#ff6464","#ffcc66","#6496ff","#ff8064","#ff64f0","#64fff0","#f0ff64","#a064ff"],
+            spectrumLow: [255, 0, 100], spectrumMid: [255, 160, 0], spectrumHigh: [255, 220, 100],
+            waterfallGrid: [40, 20, 0], waterfallAxis: [80, 60, 40],
+        },
+    },
+    blue: {
+        name: "Blue CRT",
+        css: {
+            "--bg": "#040610", "--panel": "#0a0f1a", "--panel-2": "#0f1420",
+            "--border": "#1a2840", "--text": "#c8d8f0", "--muted": "#6a7a9a",
+            "--accent": "#4a8aff", "--accent-dim": "#2a6acc", "--danger": "#ff7676",
+            "--body-grad": "#060812",
+            "--led-on": "#4af", "--led-off": "#136", "--led-border": "#036",
+            "--led-glow": "#4af", "--led-ring": "#0d0d1a", "--led-inset": "#002", "--led-outer": "#06a",
+            "--bezel-border": "#0d0d1a", "--bezel-outer": "#0a0f1a", "--bezel-mid": "#141428",
+            "--screen-bg": "#020408", "--canvas-bg": "#020406",
+        },
+        canvas: {
+            bgGrad: ["#0a0a14", "#06060f", "#020208"],
+            trace: "#66aaff", traceGlow: [100, 160, 255], traceBright: [200, 220, 255],
+            gridDim: [60, 100, 200], gridBright: [80, 140, 220], gridAccent: [100, 160, 255],
+            label: [100, 160, 220], readout: [100, 160, 220],
+            markerOrange: [255, 200, 100], markerBlue: [100, 200, 255],
+            waveColors: ["#ff6464","#66aaff","#64ffa0","#ffa064","#ff64f0","#64fff0","#f0ff64","#a064ff"],
+            spectrumLow: [200, 0, 255], spectrumMid: [0, 100, 255], spectrumHigh: [100, 200, 255],
+            waterfallGrid: [0, 10, 40], waterfallAxis: [20, 40, 80],
+        },
+    },
+    white: {
+        name: "White",
+        css: {
+            "--bg": "#1a1a1a", "--panel": "#242424", "--panel-2": "#2e2e2e",
+            "--border": "#444", "--text": "#e0e0e0", "--muted": "#888",
+            "--accent": "#e0e0e0", "--accent-dim": "#aaa", "--danger": "#ff7676",
+            "--body-grad": "#111",
+            "--led-on": "#fff", "--led-off": "#444", "--led-border": "#333",
+            "--led-glow": "#fff", "--led-ring": "#1a1a1a", "--led-inset": "#111", "--led-outer": "#555",
+            "--bezel-border": "#1a1a1a", "--bezel-outer": "#242424", "--bezel-mid": "#333",
+            "--screen-bg": "#111", "--canvas-bg": "#0a0a0a",
+        },
+        canvas: {
+            bgGrad: ["#1a1a1a", "#111", "#0a0a0a"],
+            trace: "#ffffff", traceGlow: [255, 255, 255], traceBright: [255, 255, 255],
+            gridDim: [80, 80, 80], gridBright: [120, 120, 120], gridAccent: [180, 180, 180],
+            label: [160, 160, 160], readout: [140, 140, 140],
+            markerOrange: [255, 200, 100], markerBlue: [100, 200, 255],
+            waveColors: ["#ff6464","#ffffff","#6496ff","#ffa064","#ff64f0","#64fff0","#f0ff64","#a064ff"],
+            spectrumLow: [100, 0, 200], spectrumMid: [150, 150, 200], spectrumHigh: [220, 220, 255],
+            waterfallGrid: [30, 30, 30], waterfallAxis: [60, 60, 60],
+        },
+    },
+};
+
+let themeColors = THEMES.green.canvas;  // default
+
+function applyTheme(name) {
+    const theme = THEMES[name];
+    if (!theme) return;
+    const root = document.documentElement.style;
+    for (const [k, v] of Object.entries(theme.css)) {
+        root.setProperty(k, v);
+    }
+    // Update hardcoded CSS that can't use variables (rgba with accent RGB components)
+    const glowR = theme.canvas.gridBright[0], glowG = theme.canvas.gridBright[1], glowB = theme.canvas.gridBright[2];
+    const acR = theme.canvas.traceGlow[0], acG = theme.canvas.traceGlow[1], acB = theme.canvas.traceGlow[2];
+    root.setProperty("--glow-rgba", `rgba(${glowR},${glowG},${glowB},0.02)`);
+    root.setProperty("--glow-rgba-2", `rgba(${glowR},${glowG},${glowB},0.05)`);
+    root.setProperty("--glow-rgba-3", `rgba(${glowR},${glowG},${glowB},0.03)`);
+    root.setProperty("--glow-rgba-10", `rgba(${glowR},${glowG},${glowB},0.1)`);
+    root.setProperty("--accent-rgba-15", `rgba(${acR},${acG},${acB},0.15)`);
+    root.setProperty("--accent-rgba-18", `rgba(${acR},${acG},${acB},0.18)`);
+    root.setProperty("--slider-glow", `rgba(${acR},${acG},${acB},0.15)`);
+    // Update body background
+    document.body.style.background = `radial-gradient(1200px 600px at 50% -10%, ${theme.css["--body-grad"]}, ${theme.css["--bg"]})`;
+    // Update canvas colours
+    themeColors = theme.canvas;
+    // Save and redraw
+    localStorage.setItem("sines-theme", name);
+    draw(waveVisible);
+}
 
 // ============================================================
 // State
@@ -793,9 +943,9 @@ function drawBackground(ctx, w, h) {
     const cy = h / 2;
 
     const bgGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) * 0.7);
-    bgGrad.addColorStop(0, "#0a140a");
-    bgGrad.addColorStop(0.6, "#060f06");
-    bgGrad.addColorStop(1, "#020802");
+    bgGrad.addColorStop(0, themeColors.bgGrad[0]);
+    bgGrad.addColorStop(0.6, themeColors.bgGrad[1]);
+    bgGrad.addColorStop(1, themeColors.bgGrad[2]);
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
@@ -815,7 +965,7 @@ function drawGraticule(ctx, w, h) {
 
     // Minor grid
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(80, 200, 100, 0.035)";
+    ctx.strokeStyle = rgba(themeColors.gridDim, 0.035);
     ctx.lineWidth = 1;
     for (let x = divX * 0.2; x < w; x += divX * 0.2) {
         ctx.moveTo(x + 0.5, 0);
@@ -829,7 +979,7 @@ function drawGraticule(ctx, w, h) {
 
     // Major grid
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(80, 200, 100, 0.09)";
+    ctx.strokeStyle = rgba(themeColors.gridDim, 0.09);
     ctx.lineWidth = 1;
     for (let x = divX; x < w; x += divX) {
         ctx.moveTo(x + 0.5, 0);
@@ -843,7 +993,7 @@ function drawGraticule(ctx, w, h) {
 
     // Center axes
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(100, 220, 140, 0.18)";
+    ctx.strokeStyle = rgba(themeColors.gridBright, 0.18);
     ctx.lineWidth = 1;
     ctx.moveTo(cx + 0.5, 0);
     ctx.lineTo(cx + 0.5, h);
@@ -853,7 +1003,7 @@ function drawGraticule(ctx, w, h) {
 
     // Tick marks on center axes
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(100, 220, 140, 0.35)";
+    ctx.strokeStyle = rgba(themeColors.gridBright, 0.35);
     ctx.lineWidth = 1;
     for (let x = divX; x < w; x += divX) {
         ctx.moveTo(x + 0.5, cy - 6);
@@ -870,7 +1020,7 @@ function drawPersistenceFrames(ctx, w, h) {
     if (persistFrames.length === 0) return;
     persistFrames.forEach((frame, i) => {
         const alpha = 0.18 * Math.pow(0.55, persistFrames.length - 1 - i);
-        ctx.strokeStyle = `rgba(100, 255, 160, ${alpha})`;
+        ctx.strokeStyle = rgba(themeColors.traceGlow, alpha);
         ctx.lineWidth = 1.5;
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
@@ -888,10 +1038,6 @@ function drawPersistenceFrames(ctx, w, h) {
 }
 
 let multiColor = false;
-const WAVE_COLORS = [
-    "#ff6464", "#64ffa0", "#6496ff", "#ffa064",
-    "#ff64f0", "#64fff0", "#f0ff64", "#a064ff"
-];
 
 function drawWaveform(ctx, w, h) {
     const cy = h / 2;
@@ -913,7 +1059,7 @@ function drawWaveform(ctx, w, h) {
                 if (first) { ctx.moveTo(x, y); first = false; }
                 else { ctx.lineTo(x, y); }
             }
-            ctx.strokeStyle = WAVE_COLORS[idx % WAVE_COLORS.length];
+            ctx.strokeStyle = themeColors.waveColors[idx % themeColors.waveColors.length];
             ctx.lineWidth = 1.5;
             ctx.globalAlpha = 0.65;
             ctx.stroke();
@@ -932,12 +1078,12 @@ function drawWaveform(ctx, w, h) {
         else { ctx.lineTo(x, y); }
     }
     if (multiColor) {
-        ctx.strokeStyle = "rgba(100, 255, 160, 0.25)";
+        ctx.strokeStyle = rgba(themeColors.traceGlow, 0.25);
         ctx.lineWidth = 1;
     } else {
-        ctx.strokeStyle = "#64ffa0";
+        ctx.strokeStyle = themeColors.trace;
         ctx.lineWidth = 2;
-        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+        ctx.shadowColor = rgba(themeColors.traceGlow, 0.9);
         ctx.shadowBlur = 6;
     }
     ctx.lineJoin = "round";
@@ -953,7 +1099,7 @@ function drawWaveform(ctx, w, h) {
         if (first) { ctx.moveTo(x, y); first = false; }
         else { ctx.lineTo(x, y); }
     }
-    ctx.strokeStyle = "rgba(200, 255, 220, 0.95)";
+    ctx.strokeStyle = rgba(themeColors.traceBright, 0.95);
     ctx.lineWidth = 1;
     ctx.stroke();
 
@@ -994,10 +1140,10 @@ function drawSpectrum(ctx, w, h) {
 
         // Draw spectrum bars
         ctx.beginPath();
-        ctx.strokeStyle = "#64ffa0";
+        ctx.strokeStyle = themeColors.trace;
         ctx.lineWidth = 2;
         ctx.lineCap = "butt";
-        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+        ctx.shadowColor = rgba(themeColors.traceGlow, 0.9);
         ctx.shadowBlur = 6;
 
         if (spectrumLogScale) {
@@ -1020,9 +1166,9 @@ function drawSpectrum(ctx, w, h) {
             }
             ctx.lineTo(w, baseY);
             ctx.closePath();
-            ctx.fillStyle = "rgba(100, 255, 160, 0.3)";
+            ctx.fillStyle = rgba(themeColors.traceGlow, 0.3);
             ctx.fill();
-            ctx.strokeStyle = "#64ffa0";
+            ctx.strokeStyle = themeColors.trace;
             ctx.lineWidth = 1.5;
             ctx.stroke();
         } else {
@@ -1045,7 +1191,7 @@ function drawSpectrum(ctx, w, h) {
 
         // dB grid lines
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(100, 220, 140, 0.15)";
+        ctx.strokeStyle = rgba(themeColors.gridBright, 0.15);
         ctx.lineWidth = 1;
         for (let db = -10; db >= -dbRange; db -= 10) {
             const y = baseY - (db / -dbRange) * span;
@@ -1056,7 +1202,7 @@ function drawSpectrum(ctx, w, h) {
 
         // Baseline
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(100, 220, 140, 0.25)";
+        ctx.strokeStyle = rgba(themeColors.gridBright, 0.25);
         ctx.lineWidth = 1;
         ctx.moveTo(0, baseY + 0.5);
         ctx.lineTo(w, baseY + 0.5);
@@ -1073,10 +1219,10 @@ function drawSpectrum(ctx, w, h) {
         const span = baseY - topY;
 
         ctx.beginPath();
-        ctx.strokeStyle = "#64ffa0";
+        ctx.strokeStyle = themeColors.trace;
         ctx.lineWidth = 2;
         ctx.lineCap = "butt";
-        ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
+        ctx.shadowColor = rgba(themeColors.traceGlow, 0.9);
         ctx.shadowBlur = 6;
 
         if (spectrumLogScale) {
@@ -1092,9 +1238,9 @@ function drawSpectrum(ctx, w, h) {
             }
             ctx.lineTo(w, baseY);
             ctx.closePath();
-            ctx.fillStyle = "rgba(100, 255, 160, 0.3)";
+            ctx.fillStyle = rgba(themeColors.traceGlow, 0.3);
             ctx.fill();
-            ctx.strokeStyle = "#64ffa0";
+            ctx.strokeStyle = themeColors.trace;
             ctx.lineWidth = 1.5;
             ctx.stroke();
         } else {
@@ -1113,7 +1259,7 @@ function drawSpectrum(ctx, w, h) {
 
         // Baseline
         ctx.beginPath();
-        ctx.strokeStyle = "rgba(100, 220, 140, 0.25)";
+        ctx.strokeStyle = rgba(themeColors.gridBright, 0.25);
         ctx.lineWidth = 1;
         ctx.moveTo(0, baseY + 0.5);
         ctx.lineTo(w, baseY + 0.5);
@@ -1146,11 +1292,11 @@ function drawXY(ctx, w, h) {
 
     // Draw the XY trace (Lissajous figure)
     ctx.beginPath();
-    ctx.strokeStyle = "#64ffa0";
+    ctx.strokeStyle = themeColors.trace;
     ctx.lineWidth = 1.5;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
-    ctx.shadowColor = "rgba(100, 255, 160, 0.8)";
+    ctx.shadowColor = rgba(themeColors.traceGlow, 0.8);
     ctx.shadowBlur = 5;
     let first = true;
     for (let i = 0; i < w; i++) {
@@ -1166,7 +1312,7 @@ function drawXY(ctx, w, h) {
 
     // Draw crosshair axes
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(100, 220, 140, 0.15)";
+    ctx.strokeStyle = rgba(themeColors.gridBright, 0.15);
     ctx.lineWidth = 1;
     ctx.moveTo(cx + 0.5, 0);
     ctx.lineTo(cx + 0.5, h);
@@ -1176,7 +1322,7 @@ function drawXY(ctx, w, h) {
 
     // Readouts for XY mode
     ctx.font = "11px 'SF Mono', 'Monaco', 'Inconsolata', monospace";
-    ctx.fillStyle = "rgba(120, 220, 160, 0.55)";
+    ctx.fillStyle = rgba(themeColors.label, 0.55);
     ctx.textAlign = "left";
     ctx.fillText("XY MODE", 12, 18);
     ctx.textAlign = "right";
@@ -1196,7 +1342,7 @@ function drawWaterfallDisplay(ctx, w, h) {
 
     // Draw frequency axis labels at top
     ctx.font = "9px 'SF Mono', monospace";
-    ctx.fillStyle = "rgba(120, 220, 160, 0.4)";
+    ctx.fillStyle = rgba(themeColors.readout, 0.4);
     ctx.textAlign = "left";
     const freqStep = FREQ_MAX / 4;
     for (let f = 0; f <= FREQ_MAX; f += freqStep) {
@@ -1228,10 +1374,20 @@ function drawWaterfallDisplay(ctx, w, h) {
             const norm = mags[bin] / maxMag;
             if (norm <= 0) continue;
 
-            // Color mapping: low=magenta, mid=cyan, high=green
-            const r = Math.round(norm < 0.5 ? norm * 512 : 255);
-            const g = Math.round(norm < 0.5 ? norm * 400 : (1 - norm) * 255 * 2);
-            const b = Math.round(norm < 0.3 ? 200 : norm > 0.7 ? (norm - 0.7) * 800 : 100);
+            // Color mapping from theme spectrum palette
+            const lo = themeColors.spectrumLow, mid = themeColors.spectrumMid, hi = themeColors.spectrumHigh;
+            let r, g, b;
+            if (norm < 0.5) {
+                const t = norm * 2;
+                r = Math.round(lo[0] + (mid[0] - lo[0]) * t);
+                g = Math.round(lo[1] + (mid[1] - lo[1]) * t);
+                b = Math.round(lo[2] + (mid[2] - lo[2]) * t);
+            } else {
+                const t = (norm - 0.5) * 2;
+                r = Math.round(mid[0] + (hi[0] - mid[0]) * t);
+                g = Math.round(mid[1] + (hi[1] - mid[1]) * t);
+                b = Math.round(mid[2] + (hi[2] - mid[2]) * t);
+            }
             ctx.fillStyle = `rgb(${r},${g},${b})`;
             ctx.fillRect(x, y, 1, frameH);
         }
@@ -1239,7 +1395,7 @@ function drawWaterfallDisplay(ctx, w, h) {
 
     // Time labels on the right
     ctx.font = "9px 'SF Mono', monospace";
-    ctx.fillStyle = "rgba(120, 220, 160, 0.4)";
+    ctx.fillStyle = rgba(themeColors.readout, 0.4);
     ctx.textAlign = "right";
     ctx.fillText("NOW", w - 4, baseY - 8);
     ctx.fillText(`${waterfallFrames.length} frames`, w - 4, topY + 20);
@@ -1255,7 +1411,7 @@ function drawCursors(ctx, w, h, mode) {
         // Vertical cursors (time)
         if (cursorV1 !== null) {
             ctx.beginPath();
-            ctx.strokeStyle = "rgba(255, 200, 100, 0.8)";
+            ctx.strokeStyle = rgba(themeColors.markerOrange, 0.8);
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
             ctx.moveTo(cursorV1 + 0.5, 0);
@@ -1267,13 +1423,13 @@ function drawCursors(ctx, w, h, mode) {
             const sampleRate = getSampleRate();
             const dt = Math.abs(cursorV2 !== null ? cursorV2 - cursorV1 : 0) * zoom / sampleRate * 1000;
             ctx.font = "10px 'SF Mono', monospace";
-            ctx.fillStyle = "rgba(255, 200, 100, 0.9)";
+            ctx.fillStyle = rgba(themeColors.markerOrange, 0.9);
             ctx.textAlign = "left";
             ctx.fillText(`ΔT: ${dt.toFixed(2)}ms`, cursorV1 + 4, 30);
         }
         if (cursorV2 !== null && cursorV2 !== cursorV1) {
             ctx.beginPath();
-            ctx.strokeStyle = "rgba(255, 200, 100, 0.8)";
+            ctx.strokeStyle = rgba(themeColors.markerOrange, 0.8);
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
             ctx.moveTo(cursorV2 + 0.5, 0);
@@ -1285,7 +1441,7 @@ function drawCursors(ctx, w, h, mode) {
         // Horizontal cursors (voltage)
         if (cursorH1 !== null) {
             ctx.beginPath();
-            ctx.strokeStyle = "rgba(100, 200, 255, 0.8)";
+            ctx.strokeStyle = rgba(themeColors.markerBlue, 0.8);
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
             ctx.moveTo(0, cursorH1 + 0.5);
@@ -1295,7 +1451,7 @@ function drawCursors(ctx, w, h, mode) {
         }
         if (cursorH2 !== null && cursorH2 !== cursorH1) {
             ctx.beginPath();
-            ctx.strokeStyle = "rgba(100, 200, 255, 0.8)";
+            ctx.strokeStyle = rgba(themeColors.markerBlue, 0.8);
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]);
             ctx.moveTo(0, cursorH2 + 0.5);
@@ -1307,7 +1463,7 @@ function drawCursors(ctx, w, h, mode) {
             const divY = h / 8;
             const dV = Math.abs(cursorH2 - cursorH1) / (divY * 3.5) * (1 / gain);
             ctx.font = "10px 'SF Mono', monospace";
-            ctx.fillStyle = "rgba(100, 200, 255, 0.9)";
+            ctx.fillStyle = rgba(themeColors.markerBlue, 0.9);
             ctx.textAlign = "right";
             ctx.fillText(`ΔV: ${dV.toFixed(2)}V`, w - 12, cursorH2 - 4);
         }
@@ -1329,7 +1485,7 @@ function findTriggerOffset() {
 
 function drawScanlines(ctx, w, h) {
     ctx.beginPath();
-    ctx.strokeStyle = "rgba(0, 40, 0, 0.12)";
+    ctx.strokeStyle = rgba(themeColors.gridDim, 0.12);
     ctx.lineWidth = 1;
     for (let y = 0; y < h; y += 2) {
         ctx.moveTo(0, y + 0.5);
@@ -1339,7 +1495,7 @@ function drawScanlines(ctx, w, h) {
 }
 
 function drawBezel(ctx, w, h) {
-    ctx.strokeStyle = "rgba(40, 80, 40, 0.25)";
+    ctx.strokeStyle = rgba(themeColors.gridBright, 0.25);
     ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -1358,7 +1514,7 @@ function drawBezel(ctx, w, h) {
 
 function drawReadouts(ctx, w, h, mode) {
     ctx.font = "11px 'SF Mono', 'Monaco', 'Inconsolata', monospace";
-    ctx.fillStyle = "rgba(120, 220, 160, 0.55)";
+    ctx.fillStyle = rgba(themeColors.label, 0.55);
 
     if (mode === "spec") {
         ctx.textAlign = "left";
@@ -1925,7 +2081,7 @@ function refreshSavedPresetsUI() {
     container.style.display = "flex";
     for (const name of names) {
         const pill = document.createElement("span");
-        pill.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;border-radius:999px;color:var(--accent);background:rgba(74,222,128,0.12);border:1px solid var(--accent-dim);cursor:pointer;";
+        pill.style.cssText = "display:inline-flex;align-items:center;gap:6px;padding:3px 10px;font-size:11px;font-weight:600;letter-spacing:.05em;border-radius:999px;color:var(--accent);background:var(--accent-rgba-15);border:1px solid var(--accent-dim);cursor:pointer;";
         const label = document.createElement("span");
         label.textContent = name;
         label.addEventListener("click", function () {
@@ -2277,6 +2433,19 @@ document.getElementById("canvasSize").addEventListener("change", function () {
         resizeCanvases(parseInt(parts[0]), parseInt(parts[1]));
     }
 });
+
+// ============================================================
+// UI/UX: Theme selector
+// ============================================================
+document.getElementById("themeSelect").addEventListener("change", function () {
+    applyTheme(this.value);
+});
+// Load saved theme on startup
+const savedTheme = localStorage.getItem("sines-theme");
+if (savedTheme && THEMES[savedTheme]) {
+    document.getElementById("themeSelect").value = savedTheme;
+    applyTheme(savedTheme);
+}
 
 // ============================================================
 // UI/UX: Full-screen scope mode

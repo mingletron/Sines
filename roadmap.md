@@ -49,6 +49,7 @@ Prioritized roughly by impact vs. effort.
 - [x] **Screenshot / PNG export** — 📷 button per screen downloads canvas as PNG. *(Done)*
 - [x] **Tooltip help overlay** — `?` button shows a guide covering controls, keyboard shortcuts, and oscilloscope terminology. *(Done)*
 - [x] **Wave row drag-to-reorder** — HTML5 drag-and-drop with grip handle to reorder harmonics. *(Done)*
+- [x] **Colour themes** — 4 selectable themes (Green CRT, Amber CRT, Blue CRT, White) with dropdown selector. Theme applies to all UI and canvas rendering. Persisted in localStorage. *(Done)*
 
 ## 🎵 Musical Features
 
