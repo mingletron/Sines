@@ -185,6 +185,91 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
 
 .presets { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .presets .label { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin-right: 2px; }
+
+/* Screenshot button */
+.screenshot-btn {
+    position: absolute; top: 8px; right: 8px; z-index: 12;
+    padding: 4px 8px; font-size: 14px; line-height: 1;
+    background: rgba(0,0,0,0.5); color: rgba(120,220,160,0.6);
+    border: 1px solid rgba(120,220,160,0.2); border-radius: 6px;
+    cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.screenshot-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(0,0,0,0.7); }
+
+/* Collapsible panels */
+.panel-header {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; user-select: none;
+    margin: -16px -18px 0; padding: 12px 18px;
+}
+.panel-header .panel-toggle {
+    font-size: 10px; transition: transform .2s ease;
+    color: var(--muted);
+}
+.panel.collapsed .panel-toggle { transform: rotate(-90deg); }
+.panel-body {
+    overflow: hidden; transition: max-height .25s ease, opacity .2s ease;
+    max-height: 600px; opacity: 1;
+}
+.panel.collapsed .panel-body { max-height: 0; opacity: 0; margin-top: 0; }
+.panel.collapsed .panel-header { margin-bottom: -12px; }
+
+/* Canvas resize */
+.canvas-resize { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.canvas-resize label { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.canvas-resize select { font-size: 12px; padding: 4px 8px; }
+
+/* Full-screen scope */
+.screen.fullscreen {
+    position: fixed; inset: 0; z-index: 1000;
+    margin: 0; padding: 16px; border-radius: 0;
+    background: #0a0a0a; display: flex; flex-direction: column;
+}
+.screen.fullscreen .scope-canvas { width: 100%; height: 100%; flex: 1; }
+.screen.fullscreen ~ .screen { display: none; }
+.screen.fullscreen .screenshot-btn { top: 12px; right: 12px; }
+
+/* Help overlay */
+.help-overlay {
+    display: none; position: fixed; inset: 0; z-index: 2000;
+    background: rgba(0,0,0,0.88); backdrop-filter: blur(4px);
+    overflow-y: auto; padding: 40px 20px;
+}
+.help-overlay.visible { display: flex; justify-content: center; }
+.help-content {
+    max-width: 600px; width: 100%;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 32px; color: var(--text); line-height: 1.7;
+}
+.help-content h2 { color: var(--accent); margin-top: 24px; font-size: 16px; }
+.help-content h2:first-child { margin-top: 0; }
+.help-content h3 { color: var(--accent); margin-top: 16px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+.help-content p { margin: 8px 0; font-size: 14px; }
+.help-content kbd {
+    display: inline-block; padding: 2px 7px; font-size: 12px; font-family: inherit;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--accent);
+}
+.help-content table { margin: 8px 0; }
+.help-content th, .help-content td { padding: 4px 12px 4px 0; font-size: 13px; text-align: left; }
+.help-content th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.help-close {
+    position: fixed; top: 20px; right: 24px; z-index: 2001;
+    padding: 8px 14px; font-size: 18px; cursor: pointer;
+    background: rgba(0,0,0,0.6); color: var(--muted);
+    border: 1px solid var(--border); border-radius: 8px;
+}
+.help-close:hover { color: #ff7676; border-color: #ff7676; }
+
+/* Drag-to-reorder */
+tbody tr.dragging { opacity: 0.3; }
+tbody tr.drag-over-top { border-top: 2px solid var(--accent); }
+tbody tr.drag-over-bottom { border-bottom: 2px solid var(--accent); }
+.drag-handle {
+    cursor: grab; color: var(--muted); font-size: 14px; user-select: none;
+    padding: 0 4px; opacity: 0.5; transition: opacity .15s;
+}
+.drag-handle:hover { opacity: 1; }
 </style>
 </head>
 <body>
@@ -196,15 +281,25 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     </div>
     <h1>OSCILLOSCOPE</h1>
     <span class="sub">additive sine synthesis</span>
+    <button type="button" class="secondary small" id="helpBtn" title="Help" style="margin-left:auto;">?</button>
 </header>
+<div class="canvas-resize">
+    <label for="canvasSize">Size</label>
+    <select id="canvasSize">
+        <option value="640x480" selected>640 × 480</option>
+        <option value="800x600">800 × 600</option>
+        <option value="1024x768">1024 × 768</option>
+        <option value="full">Full width</option>
+    </select>
+</div>
 <div class="screens">
-    <div class="screen">
+    <div class="screen" id="waveScreen">
         <span class="screen-label">Wave</span>
         <canvas id="waveCanvas" class="scope-canvas" width="640" height="480" data-mode="wave">
             Your browser does not support the HTML5 canvas tag.
         </canvas>
     </div>
-    <div class="screen">
+    <div class="screen" id="specScreen">
         <span class="screen-label" id="specLabel">Spectrum</span>
         <canvas id="specCanvas" class="scope-canvas" width="640" height="480" data-mode="spec">
             Your browser does not support the HTML5 canvas tag.
@@ -242,9 +337,10 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     <span class="toggle" id="cursorsToggle">Cursors</span>
 </div>
 
-<div class="panel">
+<div class="panel" data-panel="envelope">
+  <div class="panel-header"><span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Envelope</span><span class="panel-toggle">▾</span></div>
+  <div class="panel-body">
   <div class="controls">
-    <span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Envelope</span>
     <div class="control">
       <label for="attackSlider">A</label>
       <input type="range" min="1" max="2000" value="50" id="attackSlider">
@@ -266,11 +362,13 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
       <span class="readout" id="releaseReadout">200ms</span>
     </div>
   </div>
+  </div>
 </div>
 
-<div class="panel">
+<div class="panel" data-panel="midi">
+  <div class="panel-header"><span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">MIDI</span><span class="panel-toggle">▾</span></div>
+  <div class="panel-body">
   <div class="controls">
-    <span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">MIDI</span>
     <div class="control">
       <label for="midiDevice">Device</label>
       <select id="midiDevice">
@@ -286,22 +384,30 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
       <span class="readout" id="midiStatus" style="color:var(--muted);">Disconnected</span>
     </div>
   </div>
+  </div>
 </div>
 
-<div class="panel presets">
-    <span class="label">Presets</span>
+<div class="panel presets" data-panel="presets">
+    <div class="panel-header"><span class="label">Presets</span><span class="panel-toggle">▾</span></div>
+    <div class="panel-body">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <button type="button" class="secondary small preset-btn" data-preset="sine">Sine</button>
     <button type="button" class="secondary small preset-btn" data-preset="saw">Sawtooth</button>
     <button type="button" class="secondary small preset-btn" data-preset="square">Square</button>
     <button type="button" class="secondary small preset-btn" data-preset="triangle">Triangle</button>
     <button type="button" class="secondary small" id="savePresetBtn">Save…</button>
+    </div>
     <div id="savedPresets" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;"></div>
+    </div>
 </div>
 
-<div class="panel">
+<div class="panel" data-panel="waves">
+    <div class="panel-header"><span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Waves</span><span class="panel-toggle">▾</span></div>
+    <div class="panel-body">
     <table id="waveTable">
         <thead>
         <tr>
+            <th></th>
             <th>Frequency Hz</th>
             <th>Amplitude</th>
             <th>Phase (°)</th>
@@ -314,6 +420,59 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
         </tbody>
     </table>
     <button type="button" class="secondary add-row" id="addWaveBtn">+ Add Wave</button>
+    </div>
+</div>
+</div>
+
+<div class="help-overlay" id="helpOverlay">
+<button type="button" class="help-close" id="helpClose">✕</button>
+<div class="help-content">
+<h2>TEK SINES — Additive Synthesis Oscilloscope</h2>
+<p>Build sounds by stacking sine waves and watch the resulting waveform and its frequency spectrum update live.</p>
+
+<h3>Getting Started</h3>
+<p>Click a <strong>Preset</strong> (Sine, Sawtooth, Square, Triangle) to load a classic waveform, then press <kbd>Space</kbd> or <strong>▶ Play</strong> to hear it. Add more waves with <strong>+ Add Wave</strong> or <kbd>+</kbd>.</p>
+
+<h3>Controls</h3>
+<table>
+<tr><th>Control</th><th>What it does</th></tr>
+<tr><td>Frequency</td><td>Set the pitch in Hz, or use the Note dropdown for musical pitches (C0–B8)</td></tr>
+<tr><td>Amplitude</td><td>How loud this partial is relative to others</td></tr>
+<tr><td>Phase</td><td>Starting angle of the sine wave (0–360°). Changing phase alters the combined waveform shape</td></tr>
+<tr><td>ON/OFF</td><td>Mute or unmute a partial without removing it</td></tr>
+<tr><td>Gain</td><td>Master output volume</td></tr>
+<tr><td>Zoom</td><td>Time base — how many samples per pixel on the waveform screen</td></tr>
+<tr><td>Loop</td><td>Repeat the 2-second buffer continuously</td></tr>
+</table>
+
+<h3>Keyboard Shortcuts</h3>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<tr><td><kbd>Space</kbd></td><td>Play / Stop</td></tr>
+<tr><td><kbd>+</kbd></td><td>Add a new wave</td></tr>
+<tr><td><kbd>Backspace</kbd></td><td>Remove the last wave</td></tr>
+<tr><td><kbd>Escape</kbd></td><td>Close overlays / exit full-screen</td></tr>
+</table>
+
+<h3>Display Options</h3>
+<table>
+<tr><th>Toggle</th><th>What it does</th></tr>
+<tr><td>dB</td><td>Switch spectrum to logarithmic (decibel) magnitude scale</td></tr>
+<tr><td>Log Freq</td><td>Switch spectrum to logarithmic frequency axis (musical spacing)</td></tr>
+<tr><td>Trig ▲ ▼ ─</td><td>Trigger mode for waveform display — syncs the trace to a signal edge or level</td></tr>
+<tr><td>Cursors</td><td>Click to place measurement cursors on the waveform. Drag to reposition.</td></tr>
+<tr><td>XY</td><td>Show Lissajous figure instead of spectrum</td></tr>
+<tr><td>RGB</td><td>Draw each harmonic in a distinct colour</td></tr>
+<tr><td>Waterfall</td><td>Rolling waterfall display of spectrum over time</td></tr>
+</table>
+
+<h3>Oscilloscope Terminology</h3>
+<p><strong>Graticule</strong> — the grid lines on the screen. Each division represents a fixed amount of time (horizontal) or voltage (vertical).</p>
+<p><strong>Time/Div</strong> — shown in the top-left of the waveform screen. Tells you how many milliseconds each horizontal grid division represents.</p>
+<p><strong>V/Div</strong> — shown in the bottom-left. Tells you the amplitude scale per vertical division.</p>
+<p><strong>Trigger</strong> — synchronises the waveform display so the trace starts at the same point in each cycle, giving a stable image. Without triggering, the trace drifts.</p>
+<p><strong>FFT</strong> — Fast Fourier Transform. The mathematical operation that converts the time-domain waveform into its frequency spectrum, showing which frequencies are present and how strong they are.</p>
+<p><strong>Persistence</strong> — the fading trail on the waveform screen, simulating a phosphor CRT where previous traces linger before fading.</p>
 </div>
 </div>
 
@@ -1592,6 +1751,15 @@ function addRow(opts) {
 
     const tbody = document.getElementById("waveTable").tBodies[0];
     const row = tbody.insertRow(-1);
+    row.draggable = true;
+    row.dataset.waveId = id;
+
+    // Drag handle
+    const handleCell = row.insertCell(-1);
+    const handle = document.createElement("span");
+    handle.className = "drag-handle";
+    handle.textContent = "⠿";
+    handleCell.appendChild(handle);
 
     // Frequency text input
     const freqCell = row.insertCell(-1);
@@ -1989,6 +2157,243 @@ waterfallBtn.addEventListener("click", function () {
     draw(true);
 });
 document.getElementById("controls").querySelector(".spacer").before(waterfallBtn);
+
+// ============================================================
+// UI/UX: Screenshot export
+// ============================================================
+function addScreenshotButton(screenEl, canvasId) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "screenshot-btn";
+    btn.textContent = "📷";
+    btn.title = "Download screenshot as PNG";
+    btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        const canvas = document.getElementById(canvasId);
+        const link = document.createElement("a");
+        link.download = canvasId + ".png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+    });
+    screenEl.appendChild(btn);
+}
+addScreenshotButton(document.getElementById("waveScreen"), "waveCanvas");
+addScreenshotButton(document.getElementById("specScreen"), "specCanvas");
+
+// ============================================================
+// UI/UX: Collapsible panels
+// ============================================================
+document.querySelectorAll(".panel[data-panel]").forEach(function (panel) {
+    const key = "sines-panel-" + panel.dataset.panel;
+    const header = panel.querySelector(".panel-header");
+    if (!header) return;
+
+    // Restore collapsed state from localStorage
+    if (localStorage.getItem(key) === "collapsed") {
+        panel.classList.add("collapsed");
+    }
+
+    header.addEventListener("click", function () {
+        panel.classList.toggle("collapsed");
+        localStorage.setItem(key, panel.classList.contains("collapsed") ? "collapsed" : "expanded");
+    });
+});
+
+// ============================================================
+// UI/UX: Keyboard shortcuts
+// ============================================================
+document.addEventListener("keydown", function (e) {
+    // Don't intercept when typing in inputs
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+
+    // Escape: close help overlay, exit full-screen
+    if (e.key === "Escape") {
+        const overlay = document.getElementById("helpOverlay");
+        if (overlay.classList.contains("visible")) {
+            overlay.classList.remove("visible");
+            return;
+        }
+        const fs = document.querySelector(".screen.fullscreen");
+        if (fs) {
+            fs.classList.remove("fullscreen");
+            resizeCanvases(lastCanvasW, lastCanvasH);
+            draw(waveVisible);
+            return;
+        }
+        return;
+    }
+
+    // Space: Play/Stop
+    if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        if (isNoteOn) noteOff(false);
+        else noteOn();
+        return;
+    }
+
+    // + or =: Add wave
+    if (e.key === "+" || e.key === "=") {
+        addRow();
+        return;
+    }
+
+    // Backspace/Delete: Remove last wave
+    if (e.key === "Backspace" || e.key === "Delete") {
+        if (waves.length > 0) {
+            removeWave(waves[waves.length - 1].id);
+        }
+        return;
+    }
+});
+
+// ============================================================
+// UI/UX: Canvas resize
+// ============================================================
+let lastCanvasW = 640, lastCanvasH = 480;
+
+function resizeCanvases(w, h) {
+    lastCanvasW = w;
+    lastCanvasH = h;
+    ["waveCanvas", "specCanvas"].forEach(function (id) {
+        const c = document.getElementById(id);
+        c.width = w;
+        c.height = h;
+    });
+    // Reset cursors — they're in pixel space
+    cursorV1 = cursorV2 = cursorH1 = cursorH2 = null;
+    draw(waveVisible);
+}
+
+document.getElementById("canvasSize").addEventListener("change", function () {
+    const val = this.value;
+    if (val === "full") {
+        const container = document.querySelector(".screens");
+        const w = Math.floor(container.clientWidth - 32); // account for gap/padding
+        const h = Math.floor(w * 3 / 4);
+        resizeCanvases(w, h);
+    } else {
+        const parts = val.split("x");
+        resizeCanvases(parseInt(parts[0]), parseInt(parts[1]));
+    }
+});
+
+// ============================================================
+// UI/UX: Full-screen scope mode
+// ============================================================
+document.querySelectorAll(".screen").forEach(function (screen) {
+    screen.addEventListener("dblclick", function () {
+        if (screen.classList.contains("fullscreen")) {
+            screen.classList.remove("fullscreen");
+            resizeCanvases(lastCanvasW, lastCanvasH);
+        } else {
+            screen.classList.add("fullscreen");
+            const w = window.innerWidth - 32;
+            const h = window.innerHeight - 32;
+            const canvas = screen.querySelector("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            draw(waveVisible);
+        }
+    });
+});
+
+// ============================================================
+// UI/UX: Help overlay
+// ============================================================
+document.getElementById("helpBtn").addEventListener("click", function () {
+    document.getElementById("helpOverlay").classList.add("visible");
+});
+document.getElementById("helpClose").addEventListener("click", function () {
+    document.getElementById("helpOverlay").classList.remove("visible");
+});
+document.getElementById("helpOverlay").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("visible");
+});
+
+// ============================================================
+// UI/UX: Wave row drag-to-reorder
+// ============================================================
+let dragWaveId = null;
+
+document.getElementById("waveTable").addEventListener("dragstart", function (e) {
+    const row = e.target.closest("tr");
+    if (!row || !row.dataset.waveId) return;
+    dragWaveId = parseInt(row.dataset.waveId);
+    row.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", dragWaveId);
+});
+
+document.getElementById("waveTable").addEventListener("dragover", function (e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const row = e.target.closest("tr");
+    if (!row || !row.dataset.waveId) return;
+    // Clear all indicators
+    this.querySelectorAll(".drag-over-top, .drag-over-bottom").forEach(function (r) {
+        r.classList.remove("drag-over-top", "drag-over-bottom");
+    });
+    // Show indicator above or below based on mouse position
+    const rect = row.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    if (e.clientY < mid) {
+        row.classList.add("drag-over-top");
+    } else {
+        row.classList.add("drag-over-bottom");
+    }
+});
+
+document.getElementById("waveTable").addEventListener("dragleave", function (e) {
+    const row = e.target.closest("tr");
+    if (row) {
+        row.classList.remove("drag-over-top", "drag-over-bottom");
+    }
+});
+
+document.getElementById("waveTable").addEventListener("drop", function (e) {
+    e.preventDefault();
+    const row = e.target.closest("tr");
+    if (!row || !row.dataset.waveId || dragWaveId === null) return;
+
+    const targetId = parseInt(row.dataset.waveId);
+    if (dragWaveId === targetId) return;
+
+    // Find indices in waves array
+    const fromIdx = waves.findIndex(function (w) { return w.id === dragWaveId; });
+    const toIdx = waves.findIndex(function (w) { return w.id === targetId; });
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    // Determine drop position (above or below)
+    const rect = row.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    const insertBefore = e.clientY < mid;
+    let newIdx = insertBefore ? toIdx : toIdx + 1;
+    if (fromIdx < newIdx) newIdx--; // account for removal shifting indices
+
+    // Reorder waves array
+    const [moved] = waves.splice(fromIdx, 1);
+    waves.splice(newIdx, 0, moved);
+
+    // Reorder DOM rows to match
+    const tbody = this.tBodies[0];
+    const rows = Array.from(tbody.rows);
+    const movedRow = rows[fromIdx];
+    if (insertBefore) {
+        tbody.insertBefore(movedRow, rows[toIdx]);
+    } else {
+        tbody.insertBefore(movedRow, rows[toIdx].nextSibling);
+    }
+
+    rebuildBuffer();
+});
+
+document.getElementById("waveTable").addEventListener("dragend", function () {
+    this.querySelectorAll(".dragging, .drag-over-top, .drag-over-bottom").forEach(function (r) {
+        r.classList.remove("dragging", "drag-over-top", "drag-over-bottom");
+    });
+    dragWaveId = null;
+});
 
 refreshSavedPresetsUI();
 

@@ -60,7 +60,7 @@ function createStubEnvironment() {
             insertBefore: () => {},
             insertRow: () => ({ insertCell: () => ({ appendChild: () => {} }), appendChild: () => {} }),
             deleteRow: () => {},
-            tBodies: [{ rows: [], insertRow: () => ({ insertCell: () => ({ appendChild: () => {} }), appendChild: () => {} }) }],
+            tBodies: [{ rows: [], insertRow: () => ({ insertCell: () => ({ appendChild: () => {} }), appendChild: () => {}, draggable: false, dataset: {} }) }],
             getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 480 }),
         };
     }
@@ -75,6 +75,7 @@ function createStubEnvironment() {
         'trigFalling', 'trigLevel', 'cursorsToggle', 'waveCanvas', 'specCanvas',
         'powerLed', 'midiDevice', 'midiStatus', 'midiNoteDisplay',
         'gainReadout', 'zoomReadout', 'controls', 'savedPresets',
+        'waveScreen', 'specScreen', 'canvasSize', 'helpOverlay', 'helpBtn', 'helpClose',
     ];
     for (const id of ids) elements[id] = makeProxy(id);
 
@@ -88,10 +89,16 @@ function createStubEnvironment() {
     return {
         document: {
             getElementById: (id) => elements[id] || makeProxy(id),
-            querySelector: () => null,
-            querySelectorAll: () => [],
+            querySelector: (sel) => {
+                if (sel === '.screen.fullscreen') return null;
+                if (sel === '.screens') return elements['controls'];
+                return null;
+            },
+            querySelectorAll: (sel) => [],
             createElement: (tag) => makeProxy(tag),
             body: { appendChild: () => {} },
+            addEventListener: () => {},
+            activeElement: null,
         },
         window: {
             AudioContext: function () {
@@ -122,6 +129,7 @@ function createStubEnvironment() {
             crypto: { randomUUID: () => '00000000-0000-0000-0000-000000000000' },
             location: { hash: '' },
             addEventListener: () => {},
+            innerWidth: 1024, innerHeight: 768,
         },
         navigator: { requestMIDIAccess: () => Promise.reject() },
         localStorage: {
