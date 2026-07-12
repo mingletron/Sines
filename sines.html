@@ -739,30 +739,30 @@ function drawWaveform(ctx, w, h) {
     const divY = h / 8;
     const currentFrame = new Array(w);
     const trigOffset = findTriggerOffset();
+    const rate = getSampleRate();
 
-    if (multiColor && waves.some(w => w.enabled)) {
-        // Draw each enabled wave in its own color
-        const rate = getSampleRate();
-        waves.forEach((w, idx) => {
-            if (!w.enabled) return;
+    if (multiColor && waves.some(function (ww) { return ww.enabled; })) {
+        // Draw each enabled wave as an independent coloured trace
+        waves.forEach(function (wave, idx) {
+            if (!wave.enabled) return;
             ctx.beginPath();
             let first = true;
-            const freq = parseFloat(w.freq) * (midiRatio || 1);
+            const freq = parseFloat(wave.freq) * (midiRatio || 1);
             for (let x = 0; x < w; ++x) {
                 const sample = Math.min(buf.length - 1, Math.round(x * zoom) + trigOffset);
-                const y = cy + Math.sin(freq * kPI_2 * sample / rate + w.phase) * w.amp * gain * -divY * 3.5;
+                const y = cy + Math.sin(freq * kPI_2 * sample / rate + wave.phase) * wave.amp * gain * -divY * 3.5;
                 if (first) { ctx.moveTo(x, y); first = false; }
                 else { ctx.lineTo(x, y); }
             }
             ctx.strokeStyle = WAVE_COLORS[idx % WAVE_COLORS.length];
             ctx.lineWidth = 1.5;
-            ctx.globalAlpha = 0.6;
+            ctx.globalAlpha = 0.65;
             ctx.stroke();
             ctx.globalAlpha = 1.0;
         });
     }
 
-    // Composite trace (dim when multi-color is on)
+    // Composite trace (dim when multi-color is on, so coloured traces stand out)
     ctx.beginPath();
     let first = true;
     for (let x = 0; x < w; ++x) {
@@ -772,14 +772,17 @@ function drawWaveform(ctx, w, h) {
         if (first) { ctx.moveTo(x, y); first = false; }
         else { ctx.lineTo(x, y); }
     }
-    ctx.strokeStyle = multiColor ? "rgba(100, 255, 160, 0.4)" : "#64ffa0";
-    ctx.lineWidth = multiColor ? 1 : 2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    if (!multiColor) {
+    if (multiColor) {
+        ctx.strokeStyle = "rgba(100, 255, 160, 0.25)";
+        ctx.lineWidth = 1;
+    } else {
+        ctx.strokeStyle = "#64ffa0";
+        ctx.lineWidth = 2;
         ctx.shadowColor = "rgba(100, 255, 160, 0.9)";
         ctx.shadowBlur = 6;
     }
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
     ctx.stroke();
     ctx.shadowBlur = 0;
 
@@ -845,11 +848,15 @@ function drawSpectrum(ctx, w, h) {
             for (let bin = 1; bin < maxBin; bin++) {
                 const freq = bin * binHz;
                 if (freq < 10) continue;
+                const ratio = mags[bin] / maxMag;
+                if (ratio <= 0) continue;
+                const db = 20 * Math.log10(ratio);
+                if (!isFinite(db)) continue;
+                const barH = (db / -dbRange) * span;
+                if (barH <= 0) continue;
                 const x = freqToX(freq, w);
                 if (x > w) break;
-                const db = 20 * Math.log10(mags[bin] / maxMag);
-                const barH = (db / -dbRange) * span;
-                const y = baseY - Math.max(0, barH);
+                const y = baseY - barH;
                 ctx.lineTo(x + 0.5, y);
             }
             ctx.lineTo(w, baseY);
@@ -865,10 +872,13 @@ function drawSpectrum(ctx, w, h) {
                 let bin = Math.round(freq / binHz);
                 if (bin < 1) bin = 1;
                 if (bin >= maxBin) continue;
-                const db = 20 * Math.log10(mags[bin] / maxMag);
+                const ratio = mags[bin] / maxMag;
+                if (ratio <= 0) continue;
+                const db = 20 * Math.log10(ratio);
                 const barH = (db / -dbRange) * span;
+                if (!isFinite(barH) || barH < 0) continue;
                 ctx.moveTo(x + 0.5, baseY);
-                ctx.lineTo(x + 0.5, baseY - Math.max(0, barH));
+                ctx.lineTo(x + 0.5, baseY - barH);
             }
             ctx.stroke();
         }
@@ -952,8 +962,8 @@ function drawSpectrum(ctx, w, h) {
     }
 
     // Draw waterfall if in waterfall mode (set via third screen or mode toggle)
-    if (waterfallFrames.length > 0) {
-        drawWaterfall(ctx, w, h);
+    if (waterfallMode && waterfallFrames.length > 0) {
+        drawWaterfallDisplay(ctx, w, h);
     }
 }
 
