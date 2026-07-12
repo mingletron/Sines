@@ -147,7 +147,7 @@ button.ghost:hover { color: var(--danger); border-color: var(--danger); filter: 
 
 input[type=range] {
     -webkit-appearance: none; appearance: none;
-    width: 150px; height: 6px; margin: 0;
+    width: 100px; height: 6px; margin: 0;
     background: var(--panel-2); border: 1px solid var(--border); border-radius: 999px;
     cursor: pointer;
 }
@@ -431,7 +431,9 @@ tbody tr.drag-over-bottom { border-bottom: 2px solid var(--accent); }
             <th>Frequency Hz</th>
             <th>Amplitude</th>
             <th>Phase (°)</th>
+            <th>Detune (¢)</th>
             <th>Note</th>
+            <th>Type</th>
             <th>Enabled</th>
             <th></th>
         </tr>
@@ -808,12 +810,15 @@ let fftRe = null, fftIm = null, fftWin = null, fftBitRev = null, fftCosT = null,
 // Wave model
 // ============================================================
 class Wave {
-    constructor(id, freq, amp, phase, enabled) {
+    constructor(id, freq, amp, phase, enabled, detune, type, noiseColor) {
         this.id = id;
         this.freq = freq;
         this.amp = amp;
         this.phase = phase;
         this.enabled = enabled;
+        this.detune = detune || 0;
+        this.type = type || "sine";
+        this.noiseColor = noiseColor || "white";
     }
 }
 
@@ -829,19 +834,54 @@ function clearBuffer() {
     spectrumDirty = true;
 }
 
-function writeSine(buf, freq, amp, phase, enabled, sampleRate) {
+function writeSine(buf, freq, amp, phase, enabled, sampleRate, detune) {
     if (!enabled) return;
     const rate = sampleRate || kSampleRate;
+    const detunedFreq = detune ? freq * Math.pow(2, detune / 1200) : freq;
     const len = buf.length;
     for (let i = 0; i < len; ++i) {
-        buf[i] += Math.sin(freq * kPI_2 * i / rate + phase) * amp;
+        buf[i] += Math.sin(detunedFreq * kPI_2 * i / rate + phase) * amp;
+    }
+}
+
+function writeNoise(buf, amp, enabled, color) {
+    if (!enabled) return;
+    const len = buf.length;
+    if (color === "pink") {
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < len; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            b6 = white * 0.115926;
+            const pink = (b0 + b1 + b2 + b3 + b4 + b5 + b6) * 0.11;
+            buf[i] += pink * amp;
+        }
+    } else if (color === "brown") {
+        let brown = 0;
+        for (let i = 0; i < len; i++) {
+            brown = (brown + (Math.random() * 2 - 1) * 0.02) * 0.998;
+            buf[i] += brown * amp;
+        }
+    } else {
+        for (let i = 0; i < len; i++) {
+            buf[i] += (Math.random() * 2 - 1) * amp;
+        }
     }
 }
 
 function writeSines(buf, waves) {
     const rate = getSampleRate();
     for (const w of waves) {
-        writeSine(buf, w.freq * midiRatio, w.amp, w.phase, w.enabled, rate);
+        if (w.type === "noise") {
+            writeNoise(buf, w.amp, w.enabled, w.noiseColor);
+        } else {
+            writeSine(buf, w.freq * midiRatio, w.amp, w.phase, w.enabled, rate, w.detune);
+        }
     }
 }
 
@@ -1046,10 +1086,10 @@ function drawWaveform(ctx, w, h) {
     const trigOffset = findTriggerOffset();
     const rate = getSampleRate();
 
-    if (multiColor && waves.some(function (ww) { return ww.enabled; })) {
+    if (multiColor && waves.some(function (ww) { return ww.enabled && ww.type !== "noise"; })) {
         // Draw each enabled wave as an independent coloured trace
         waves.forEach(function (wave, idx) {
-            if (!wave.enabled) return;
+            if (!wave.enabled || wave.type === "noise") return;
             ctx.beginPath();
             let first = true;
             const freq = parseFloat(wave.freq) * (midiRatio || 1);
@@ -1865,6 +1905,50 @@ function updatePhase(slider) {
     if (w.enabled) rebuildBuffer();
 }
 
+function updateDetune(slider) {
+    const id = parseInt(slider.id.replace("detune_", ""));
+    const w = findWave(id);
+    if (!w) return;
+    w.detune = parseInt(slider.value);
+    if (w.enabled) rebuildBuffer();
+}
+
+function toggleWaveType(id) {
+    const w = findWave(id);
+    if (!w) return;
+    w.type = w.type === "noise" ? "sine" : "noise";
+    const typeToggle = document.getElementById(id + "_typeToggle");
+    if (typeToggle) {
+        typeToggle.textContent = w.type === "noise" ? "NOISE" : "SINE";
+        typeToggle.classList.toggle("on", w.type === "noise");
+    }
+    updateRowControls(id);
+    if (w.enabled) rebuildBuffer();
+}
+
+function updateNoiseColor(id, color) {
+    const w = findWave(id);
+    if (!w) return;
+    w.noiseColor = color;
+    if (w.enabled) rebuildBuffer();
+}
+
+function updateRowControls(id) {
+    const w = findWave(id);
+    if (!w) return;
+    const isNoise = w.type === "noise";
+    const freqInput = document.getElementById(id + "_freq");
+    const phaseSlider = document.getElementById("phase_" + id);
+    const detuneSlider = document.getElementById("detune_" + id);
+    const noteSelect = document.getElementById(id + "_note");
+    const colorSelect = document.getElementById(id + "_noiseColor");
+    if (freqInput) { freqInput.disabled = isNoise; freqInput.style.opacity = isNoise ? "0.4" : "1"; }
+    if (phaseSlider) { phaseSlider.disabled = isNoise; phaseSlider.style.opacity = isNoise ? "0.4" : "1"; }
+    if (detuneSlider) { detuneSlider.disabled = isNoise; detuneSlider.style.opacity = isNoise ? "0.4" : "1"; }
+    if (noteSelect) { noteSelect.disabled = isNoise; noteSelect.style.opacity = isNoise ? "0.4" : "1"; }
+    if (colorSelect) { colorSelect.style.display = isNoise ? "inline-block" : "none"; }
+}
+
 // ============================================================
 // UI — Row construction
 // ============================================================
@@ -1903,7 +1987,10 @@ function addRow(opts) {
     const enabled = !!opts.enabled;
     const id = Date.now() * 1000 + nextId++;
 
-    waves.push(new Wave(id, freq, amp, phase, enabled));
+    const detune = opts.detune != null ? opts.detune : 0;
+    const type = opts.type || "sine";
+    const noiseColor = opts.noiseColor || "white";
+    waves.push(new Wave(id, freq, amp, phase, enabled, detune, type, noiseColor));
 
     const tbody = document.getElementById("waveTable").tBodies[0];
     const row = tbody.insertRow(-1);
@@ -1950,6 +2037,18 @@ function addRow(opts) {
     phaseSlider.addEventListener("input", function () { updatePhase(this); });
     phaseCell.appendChild(phaseSlider);
 
+    // Detune slider (NEW)
+    const detuneCell = row.insertCell(-1);
+    const detuneSlider = document.createElement("input");
+    detuneSlider.type = "range";
+    detuneSlider.min = "-50";
+    detuneSlider.max = "50";
+    detuneSlider.id = "detune_" + id;
+    detuneSlider.value = detune;
+    detuneSlider.className = "range";
+    detuneSlider.addEventListener("input", function () { updateDetune(this); });
+    detuneCell.appendChild(detuneSlider);
+
     // Note dropdown
     const noteCell = row.insertCell(-1);
     const select = document.createElement("select");
@@ -1967,6 +2066,32 @@ function addRow(opts) {
         select.appendChild(option);
     }
     noteCell.appendChild(select);
+
+    // Type toggle + noise color (NEW)
+    const typeCell = row.insertCell(-1);
+    const typeToggle = document.createElement("span");
+    typeToggle.className = "toggle" + (type === "noise" ? " on" : "");
+    typeToggle.textContent = type === "noise" ? "NOISE" : "SINE";
+    typeToggle.style.fontSize = "10px";
+    typeToggle.id = id + "_typeToggle";
+    typeToggle.addEventListener("click", function () { toggleWaveType(id); });
+    typeCell.appendChild(typeToggle);
+    const colorSelect = document.createElement("select");
+    colorSelect.id = id + "_noiseColor";
+    colorSelect.style.cssText = "display:" + (type === "noise" ? "inline-block" : "none") + ";font-size:11px;width:70px;margin-top:4px;";
+    ["white", "pink", "brown"].forEach(function (c) {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c.charAt(0).toUpperCase() + c.slice(1);
+        if (c === noiseColor) opt.selected = true;
+        colorSelect.appendChild(opt);
+    });
+    colorSelect.addEventListener("change", function () { updateNoiseColor(id, this.value); });
+    typeCell.appendChild(document.createElement("br"));
+    typeCell.appendChild(colorSelect);
+
+    // Enable/disable controls based on type
+    updateRowControls(id);
 
     row.appendChild(makeEnabledToggle(id, enabled));
     row.appendChild(makeRemoveButton(id));
@@ -2025,7 +2150,7 @@ function persistPresets(store) {
 
 function serializeState() {
     return {
-        waves: waves.map(function (w) { return { freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled }; }),
+        waves: waves.map(function (w) { return { freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled, detune: w.detune, type: w.type, noiseColor: w.noiseColor }; }),
         gain: gain,
         zoom: zoom,
         attack: attack,
@@ -2062,7 +2187,7 @@ function deserializeState(state) {
 
     if (state.waves) {
         for (const w of state.waves) {
-            addRow({ freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled });
+            addRow({ freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled, detune: w.detune, type: w.type, noiseColor: w.noiseColor });
         }
     }
     rebuildBuffer();
