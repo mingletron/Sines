@@ -24,6 +24,11 @@ No build step, no package manager, no frameworks — just one `sines.html` you c
 - Play / Stop / Loop, master Gain, and time-base Zoom.
 - A 2-second buffer is generated at the AudioContext's real sample rate and played back through the Web Audio API.
 
+### Filter section
+- A **BiquadFilterNode** (LP/HP/BP) sits between the buffer source and the output, so you can sculpt the timbre in real time.
+- Collapsible panel with Enable toggle, Type select (Low Pass, High Pass, Band Pass), Freq slider (20–20000 Hz), and Q slider (0.1–30).
+- Filter state is saved and restored with presets.
+
 ### Cross-browser audio
 - The `AudioContext` is created lazily on the first user gesture (Play), satisfying Safari/Chrome autoplay rules. The buffer is allocated at the context's *actual* sample rate (often 48000 on Safari/iOS), which avoids the silent-playback pitfall of a hardcoded 44100.
 
@@ -65,6 +70,10 @@ The spectrum is a self-contained radix-2 Cooley–Tukey FFT (no library). It win
 | Zoom | Time-base samples-per-pixel of the waveform |
 | Loop | Loop the 2-second buffer |
 | Play / Stop | Transport |
+| Filter Enable | Turn the BiquadFilter on/off |
+| Filter Type | Low Pass, High Pass, or Band Pass |
+| Filter Freq | Cutoff/center frequency (20–20000 Hz) |
+| Filter Q | Resonance (0.1–30) |
 
 ## Testing
 

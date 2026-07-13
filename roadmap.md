@@ -9,11 +9,11 @@ Prioritized roughly by impact vs. effort.
 
 - [ ] **Wavetable / Custom Waveform per partial** — Let users draw or upload a custom waveform shape instead of only sine. Would make the additive engine much more flexible.
 - [ ] **FM / AM / Ring Modulation** — Add modulation routing between waves (modulator/operator model like FM synthesis).
-- [ ] **Filter section (LP/HP/BP)** — A BiquadFilterNode after the gain stage would add timbral sculpting. The UI could reuse the existing panel + slider pattern.
+- [x] **Filter section (LP/HP/BP)** — A BiquadFilterNode after the gain stage adds timbral sculpting. The UI reuses the existing panel + slider pattern. *(Done)*
 - [ ] **Effects rack (Delay, Reverb, Chorus)** — Add a post-processing chain. Each effect could be a collapsible panel with bypass toggle, matching the existing UI idiom.
-- [ ] **Detune per wave** — A fine-tuning control (±50 cents) per row, useful for chorus-like effects and microtonal exploration.
+- [x] **Detune per wave** — A fine-tuning control (±50 cents) per row, useful for chorus-like effects and microtonal exploration. *(Done)*
 - [ ] **Sub-harmonic support** — Allow frequencies below the note base (0.5×, 0.25× etc.) for deeper bass tones.
-- [ ] **Noise generator** — Add a white/pink/brown noise source as a "wave" row. Technically not additive sine, but hugely useful for real-world timbres.
+- [x] **Noise generator** — Add a white/pink/brown noise source as a "wave" row. Technically not additive sine, but hugely useful for real-world timbres. *(Done)*
 - [ ] **Polyphony** — Currently only one note at a time. Stack multiple buffers/voices for chordal play via MIDI.
 
 ## 🎹 MIDI Enhancements
