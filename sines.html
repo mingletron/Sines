@@ -284,6 +284,37 @@ tbody tr.drag-over-bottom { border-bottom: 2px solid var(--accent); }
     padding: 0 4px; opacity: 0.5; transition: opacity .15s;
 }
 .drag-handle:hover { opacity: 1; }
+
+/* Group header rows */
+.group-header td {
+    background: var(--panel-2);
+    border-top: 2px solid var(--accent-dim);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+}
+.group-header-inner {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.group-toggle {
+    cursor: pointer; user-select: none; color: var(--muted);
+    font-size: 11px; width: 12px; display: inline-block;
+}
+.group-header.collapsed .group-toggle::before { content: "▸"; }
+.group-header:not(.collapsed) .group-toggle::before { content: "▾"; }
+.group-name {
+    font-weight: 700; font-size: 13px; color: var(--accent);
+    letter-spacing: .03em; min-width: 72px;
+}
+.group-gain, .group-detune {
+    display: inline-flex; align-items: center; gap: 8px;
+}
+.group-gain label, .group-detune label {
+    color: var(--muted); font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .05em;
+}
+.group-gain input[type=range], .group-detune input[type=range] { width: 90px; }
+.group-header .readout { min-width: 44px; padding: 3px 8px; font-size: 12px; }
+.group-remove { margin-left: auto; }
 </style>
 </head>
 <body>
@@ -796,6 +827,7 @@ let decay = 0.1;
 let sustain = 0.7;
 let release = 0.2;
 let waves = [];
+let groups = [];
 let looping = false;
 let waveVisible = false;
 let nextId = 0;
@@ -847,7 +879,7 @@ let fftRe = null, fftIm = null, fftWin = null, fftBitRev = null, fftCosT = null,
 // Wave model
 // ============================================================
 class Wave {
-    constructor(id, freq, amp, phase, enabled, detune, type, noiseColor) {
+    constructor(id, freq, amp, phase, enabled, detune, type, noiseColor, groupId) {
         this.id = id;
         this.freq = freq;
         this.amp = amp;
@@ -856,6 +888,17 @@ class Wave {
         this.detune = detune || 0;
         this.type = type || "sine";
         this.noiseColor = noiseColor || "white";
+        this.groupId = groupId || null;
+    }
+}
+
+class Group {
+    constructor(id, name, gain, detune, enabled) {
+        this.id = id;
+        this.name = name;
+        this.gain = gain || 1.0;
+        this.detune = detune || 0;
+        this.enabled = enabled != null ? enabled : true;
     }
 }
 
@@ -914,10 +957,17 @@ function writeNoise(buf, amp, enabled, color) {
 function writeSines(buf, waves) {
     const rate = getSampleRate();
     for (const w of waves) {
+        if (!w.enabled) continue;
+        const group = w.groupId ? groups.find(g => g.id === w.groupId) : null;
+        if (group && !group.enabled) continue;
+        const gGain = group ? group.gain : 1;
+        const gDetune = group ? group.detune : 0;
+        const effectiveAmp = w.amp * gGain;
+        const effectiveDetune = (w.detune || 0) + gDetune;
         if (w.type === "noise") {
-            writeNoise(buf, w.amp, w.enabled, w.noiseColor);
+            writeNoise(buf, effectiveAmp, true, w.noiseColor);
         } else {
-            writeSine(buf, w.freq * midiRatio, w.amp, w.phase, w.enabled, rate, w.detune);
+            writeSine(buf, w.freq * midiRatio, effectiveAmp, w.phase, true, rate, effectiveDetune);
         }
     }
 }
@@ -1901,6 +1951,7 @@ function clearWaveforms() {
     ensureAudioContext();
     clearBuffer();
     waves = [];
+    groups = [];
     draw(false);
     const tbody = document.getElementById("waveTable").tBodies[0];
     while (tbody.rows.length > 0) {
@@ -1909,9 +1960,17 @@ function clearWaveforms() {
 }
 
 function removeWave(id) {
+    const removed = findWave(id);
+    const groupId = removed ? removed.groupId : null;
     waves = waves.filter(function (w) { return w.id != id; });
     const row = document.getElementById(id + "_freq").closest("tr");
     if (row) row.remove();
+    // If the wave belonged to a group that is now empty, remove the group + header.
+    if (groupId && getGroupWaveCount(groupId) === 0) {
+        const header = document.querySelector('#waveTable tr.group-header[data-group-id="' + groupId + '"]');
+        if (header) header.remove();
+        groups = groups.filter(function (g) { return g.id !== groupId; });
+    }
     ensureAudioContext();
     clearBuffer();
     writeSines(buf, waves);
@@ -2039,12 +2098,14 @@ function addRow(opts) {
     const detune = opts.detune != null ? opts.detune : 0;
     const type = opts.type || "sine";
     const noiseColor = opts.noiseColor || "white";
-    waves.push(new Wave(id, freq, amp, phase, enabled, detune, type, noiseColor));
+    const groupId = opts.groupId || null;
+    waves.push(new Wave(id, freq, amp, phase, enabled, detune, type, noiseColor, groupId));
 
     const tbody = document.getElementById("waveTable").tBodies[0];
     const row = tbody.insertRow(-1);
     row.draggable = true;
     row.dataset.waveId = id;
+    if (groupId) row.dataset.groupId = groupId;
 
     // Drag handle
     const handleCell = row.insertCell(-1);
@@ -2145,14 +2206,178 @@ function addRow(opts) {
     row.appendChild(makeEnabledToggle(id, enabled));
     row.appendChild(makeRemoveButton(id));
 
+    // Auto-create group header if this is the first wave in a new group.
+    if (groupId && !document.querySelector('#waveTable tr.group-header[data-group-id="' + groupId + '"]')) {
+        insertGroupHeader(groupId);
+    }
+
     return id;
+}
+
+// ============================================================
+// Groups
+// ============================================================
+const PRESET_LABELS = { sine: "Sine", saw: "Sawtooth", square: "Square", triangle: "Triangle" };
+
+function getGroupWaveCount(groupId) {
+    return waves.filter(function (w) { return w.groupId === groupId; }).length;
+}
+
+// Inserts a group header row directly above the first wave row of the group.
+function insertGroupHeader(groupId) {
+    const tbody = document.getElementById("waveTable").tBodies[0];
+    const group = groups.find(function (g) { return g.id === groupId; });
+    if (!group) return;
+    if (tbody.querySelector('tr.group-header[data-group-id="' + groupId + '"]')) return;
+
+    const firstWaveRow = tbody.querySelector('tr[data-wave-id][data-group-id="' + groupId + '"]');
+    const index = firstWaveRow ? Array.prototype.indexOf.call(tbody.rows, firstWaveRow) : -1;
+    const row = tbody.insertRow(index);
+    row.className = "group-header collapsed";
+    row.dataset.groupId = groupId;
+
+    const cell = row.insertCell(-1);
+    cell.colSpan = 9;
+
+    const wrap = document.createElement("div");
+    wrap.className = "group-header-inner";
+
+    // Collapse toggle
+    const toggle = document.createElement("span");
+    toggle.className = "group-toggle";
+    toggle.addEventListener("click", function () { toggleGroupCollapse(groupId); });
+    wrap.appendChild(toggle);
+
+    // Name
+    const name = document.createElement("span");
+    name.className = "group-name";
+    name.textContent = group.name;
+    wrap.appendChild(name);
+
+    // Gain control
+    const gainWrap = document.createElement("span");
+    gainWrap.className = "group-gain";
+    const gainLabel = document.createElement("label");
+    gainLabel.textContent = "Gain";
+    const gainSlider = document.createElement("input");
+    gainSlider.type = "range";
+    gainSlider.min = "0";
+    gainSlider.max = "200";
+    gainSlider.value = Math.round(group.gain * 100);
+    gainSlider.addEventListener("input", function () { updateGroupGain(groupId, this.value); });
+    const gainReadout = document.createElement("span");
+    gainReadout.className = "readout group-gain-readout";
+    gainReadout.id = "groupGain_" + groupId;
+    gainReadout.textContent = group.gain.toFixed(2);
+    gainWrap.appendChild(gainLabel);
+    gainWrap.appendChild(gainSlider);
+    gainWrap.appendChild(gainReadout);
+    wrap.appendChild(gainWrap);
+
+    // Detune control
+    const detWrap = document.createElement("span");
+    detWrap.className = "group-detune";
+    const detLabel = document.createElement("label");
+    detLabel.textContent = "Detune";
+    const detSlider = document.createElement("input");
+    detSlider.type = "range";
+    detSlider.min = "-100";
+    detSlider.max = "100";
+    detSlider.value = group.detune;
+    detSlider.addEventListener("input", function () { updateGroupDetune(groupId, this.value); });
+    const detReadout = document.createElement("span");
+    detReadout.className = "readout group-detune-readout";
+    detReadout.id = "groupDetune_" + groupId;
+    detReadout.textContent = group.detune + "¢";
+    detWrap.appendChild(detLabel);
+    detWrap.appendChild(detSlider);
+    detWrap.appendChild(detReadout);
+    wrap.appendChild(detWrap);
+
+    // Enabled toggle
+    const en = document.createElement("span");
+    en.className = "toggle group-enable" + (group.enabled ? " on" : "");
+    en.textContent = group.enabled ? "ON" : "OFF";
+    en.addEventListener("click", function () { toggleGroupEnabled(groupId); });
+    wrap.appendChild(en);
+
+    // Remove group
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "ghost small group-remove";
+    rm.textContent = "✕";
+    rm.addEventListener("click", function () { removeGroup(groupId); });
+    wrap.appendChild(rm);
+
+    cell.appendChild(wrap);
+
+    // Apply initial collapsed state to wave rows.
+    applyGroupCollapse(groupId, true);
+}
+
+function applyGroupCollapse(groupId, collapsed) {
+    const tbody = document.getElementById("waveTable").tBodies[0];
+    const rows = tbody.querySelectorAll('tr[data-wave-id][data-group-id="' + groupId + '"]');
+    rows.forEach(function (r) { r.style.display = collapsed ? "none" : ""; });
+}
+
+function toggleGroupCollapse(groupId) {
+    const headerRow = document.querySelector('#waveTable tr.group-header[data-group-id="' + groupId + '"]');
+    if (!headerRow) return;
+    headerRow.classList.toggle("collapsed");
+    applyGroupCollapse(groupId, headerRow.classList.contains("collapsed"));
+}
+
+function toggleGroupEnabled(groupId) {
+    const group = groups.find(function (g) { return g.id === groupId; });
+    if (!group) return;
+    group.enabled = !group.enabled;
+    const en = document.querySelector('#waveTable tr.group-header[data-group-id="' + groupId + '"] .group-enable');
+    if (en) {
+        en.textContent = group.enabled ? "ON" : "OFF";
+        en.classList.toggle("on", group.enabled);
+    }
+    rebuildBuffer();
+}
+
+function updateGroupGain(groupId, value) {
+    const group = groups.find(function (g) { return g.id === groupId; });
+    if (!group) return;
+    group.gain = value / 100;
+    const readout = document.getElementById("groupGain_" + groupId);
+    if (readout) readout.textContent = group.gain.toFixed(2);
+    rebuildBuffer();
+}
+
+function updateGroupDetune(groupId, value) {
+    const group = groups.find(function (g) { return g.id === groupId; });
+    if (!group) return;
+    group.detune = parseInt(value, 10);
+    const readout = document.getElementById("groupDetune_" + groupId);
+    if (readout) readout.textContent = group.detune + "¢";
+    rebuildBuffer();
+}
+
+function removeGroup(groupId) {
+    // Remove all wave rows belonging to the group
+    const tbody = document.getElementById("waveTable").tBodies[0];
+    const rows = tbody.querySelectorAll('tr[data-group-id="' + groupId + '"]');
+    rows.forEach(function (r) { r.remove(); });
+    waves = waves.filter(function (w) { return w.groupId !== groupId; });
+    groups = groups.filter(function (g) { return g.id !== groupId; });
+    ensureAudioContext();
+    clearBuffer();
+    writeSines(buf, waves);
+    draw(waves.length > 0);
 }
 
 // ============================================================
 // Presets
 // ============================================================
 function loadPreset(shape) {
-    clearWaveforms();
+    const groupId = Date.now() * 1000 + nextId++;
+    const group = new Group(groupId, PRESET_LABELS[shape] || shape);
+    groups.push(group);
     const f0 = kFrequency;
     const partials = 8;
     for (let n = 1; n <= partials; n++) {
@@ -2171,8 +2396,9 @@ function loadPreset(shape) {
             amp = 1 / (n * n);
             phase = (n % 4 === 3) ? Math.PI : 0;
         }
-        addRow({ freq: f0 * n, amp: amp * 0.8, phase: phase, enabled: true });
+        addRow({ freq: f0 * n, amp: amp * 0.8, phase: phase, enabled: true, groupId: groupId });
     }
+    insertGroupHeader(groupId);
     rebuildBuffer();
 }
 
@@ -2199,7 +2425,8 @@ function persistPresets(store) {
 
 function serializeState() {
     return {
-        waves: waves.map(function (w) { return { freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled, detune: w.detune, type: w.type, noiseColor: w.noiseColor }; }),
+        waves: waves.map(function (w) { return { freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled, detune: w.detune, type: w.type, noiseColor: w.noiseColor, groupId: w.groupId }; }),
+        groups: groups.map(function (g) { return { id: g.id, name: g.name, gain: g.gain, detune: g.detune, enabled: g.enabled }; }),
         gain: gain,
         zoom: zoom,
         attack: attack,
@@ -2216,6 +2443,10 @@ function serializeState() {
 
 function deserializeState(state) {
     clearWaveforms();
+    // Restore groups
+    if (state.groups) {
+        groups = state.groups.map(function (g) { return new Group(g.id, g.name, g.gain, g.detune, g.enabled); });
+    }
     gain = state.gain;
     zoom = state.zoom;
     attack = state.attack;
@@ -2250,7 +2481,7 @@ function deserializeState(state) {
 
     if (state.waves) {
         for (const w of state.waves) {
-            addRow({ freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled, detune: w.detune, type: w.type, noiseColor: w.noiseColor });
+            addRow({ freq: w.freq, amp: w.amp, phase: w.phase, enabled: w.enabled, detune: w.detune, type: w.type, noiseColor: w.noiseColor, groupId: w.groupId });
         }
     }
     rebuildBuffer();

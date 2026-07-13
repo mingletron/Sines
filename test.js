@@ -60,7 +60,8 @@ function createStubEnvironment() {
             insertBefore: () => {},
             insertRow: () => ({ insertCell: () => ({ appendChild: () => {} }), appendChild: () => {} }),
             deleteRow: () => {},
-            tBodies: [{ rows: [], insertRow: () => ({ insertCell: () => ({ appendChild: () => {} }), appendChild: () => {}, draggable: false, dataset: {} }) }],
+            tBodies: [{ rows: [], insertRow: () => ({ insertCell: () => ({ appendChild: () => {} }), appendChild: () => {}, draggable: false, dataset: {} }),
+                querySelector: () => null, querySelectorAll: () => [] }],
             getBoundingClientRect: () => ({ left: 0, top: 0, width: 640, height: 480 }),
         };
     }
@@ -433,11 +434,13 @@ function testPresets(t) {
     console.log('\n=== Presets ===');
 
     // Sine → 1 wave
+    t.clearWaveforms();
     t.loadPreset('sine');
     assert(t.waves.length === 1, `Sine: 1 wave (got ${t.waves.length})`);
     if (t.waves.length >= 1) assertClose(t.waves[0].freq, 440, 0.01, 'Sine fundamental');
 
     // Saw → 8 waves
+    t.clearWaveforms();
     t.loadPreset('saw');
     assert(t.waves.length === 8, `Saw: 8 waves (got ${t.waves.length})`);
     for (let i = 0; i < 8; i++) {
@@ -445,6 +448,7 @@ function testPresets(t) {
     }
 
     // Square → 4 waves (odd harmonics)
+    t.clearWaveforms();
     t.loadPreset('square');
     assert(t.waves.length === 4, `Square: 4 waves (got ${t.waves.length})`);
     for (let i = 0; i < 4; i++) {
@@ -452,6 +456,7 @@ function testPresets(t) {
     }
 
     // Triangle → 4 waves with alternating phase
+    t.clearWaveforms();
     t.loadPreset('triangle');
     assert(t.waves.length === 4, `Triangle: 4 waves (got ${t.waves.length})`);
     const expectedPhases = [0, Math.PI, 0, Math.PI];
@@ -485,6 +490,7 @@ function testSaveLoadPresets(t) {
 function testSerializeDeserialize(t) {
     console.log('\n=== Serialize/Deserialize ===');
 
+    t.clearWaveforms();
     // serialize captures state
     t.loadPreset('sine');
     t.gain = 0.6;
