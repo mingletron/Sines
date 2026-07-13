@@ -248,11 +248,12 @@ tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
     background: rgba(0,0,0,0.88); backdrop-filter: blur(4px);
     overflow-y: auto; padding: 40px 20px;
 }
-.help-overlay.visible { display: flex; justify-content: center; }
+.help-overlay.visible { display: block; }
 .help-content {
     max-width: 600px; width: 100%;
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 32px; color: var(--text); line-height: 1.7;
+    margin: 40px auto;
 }
 .help-content h2 { color: var(--accent); margin-top: 24px; font-size: 16px; }
 .help-content h2:first-child { margin-top: 0; }
@@ -402,6 +403,36 @@ tbody tr.drag-over-bottom { border-bottom: 2px solid var(--accent); }
     <div class="control">
       <span class="label">Status</span>
       <span class="readout" id="midiStatus" style="color:var(--muted);">Disconnected</span>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div class="panel" data-panel="filter">
+  <div class="panel-header"><span class="label" style="color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Filter</span><span class="panel-toggle">▾</span></div>
+  <div class="panel-body">
+  <div class="controls">
+    <div class="control">
+      <label for="filterEnable">Enable</label>
+      <input type="checkbox" id="filterEnable">
+    </div>
+    <div class="control">
+      <label for="filterType">Type</label>
+      <select id="filterType">
+        <option value="lowpass">Low Pass</option>
+        <option value="highpass">High Pass</option>
+        <option value="bandpass">Band Pass</option>
+      </select>
+    </div>
+    <div class="control">
+      <label for="filterFreqSlider">Freq</label>
+      <input type="range" min="20" max="20000" value="1000" id="filterFreqSlider">
+      <span class="readout" id="filterFreqReadout">1000</span>
+    </div>
+    <div class="control">
+      <label for="filterQSlider">Q</label>
+      <input type="range" min="0.1" max="30" value="1" step="0.1" id="filterQSlider">
+      <span class="readout" id="filterQReadout">1.0</span>
     </div>
   </div>
   </div>
@@ -786,6 +817,12 @@ let isNoteOn = false;
     let xyMode = false;
     let xyPhaseOffset = Math.PI / 2;
 
+    let filterEnabled = false;
+    let filterType = "lowpass";
+    let filterFreq = 1000;
+    let filterQ = 1;
+    let filterNode = null;
+
 const persistFrames = [];
 
 // Display options state
@@ -890,6 +927,13 @@ function rebuildBuffer() {
     clearBuffer();
     writeSines(buf, waves);
     draw(true);
+}
+
+function updateFilter() {
+    if (!filterNode) return;
+    filterNode.type = filterEnabled ? filterType : "allpass";
+    filterNode.frequency.value = filterFreq;
+    filterNode.Q.value = filterQ;
 }
 
 // ============================================================
@@ -1650,6 +1694,10 @@ function ensureAudioContext() {
         masterGain = aud.createGain();
         masterGain.gain.value = gain;
         masterGain.connect(aud.destination);
+        filterNode = aud.createBiquadFilter();
+        filterNode.type = "allpass";
+        filterNode.frequency.value = filterFreq;
+        filterNode.Q.value = filterQ;
         clearBuffer();
         writeSines(buf, waves);
         draw(waveVisible);
@@ -1677,7 +1725,8 @@ function noteOn() {
     const envGain = aud.createGain();
     envGain.gain.value = 0;
     envGain.connect(masterGain);
-    node.connect(envGain);
+    node.connect(filterNode);
+    filterNode.connect(envGain);
     node._envGain = envGain;
     const now = aud.currentTime;
     const g = envGain.gain;
@@ -2158,6 +2207,10 @@ function serializeState() {
         sustain: sustain,
         release: release,
         looping: looping,
+        filterEnabled: filterEnabled,
+        filterType: filterType,
+        filterFreq: filterFreq,
+        filterQ: filterQ,
     };
 }
 
@@ -2170,6 +2223,10 @@ function deserializeState(state) {
     sustain = state.sustain;
     release = state.release;
     looping = state.looping;
+    filterEnabled = !!state.filterEnabled;
+    filterType = state.filterType || "lowpass";
+    filterFreq = state.filterFreq != null ? state.filterFreq : 1000;
+    filterQ = state.filterQ != null ? state.filterQ : 1;
 
     document.getElementById("gainSlider").value = Math.round(gain * 100);
     document.getElementById("gainReadout").textContent = Math.round(gain * 100);
@@ -2184,6 +2241,12 @@ function deserializeState(state) {
     document.getElementById("releaseSlider").value = Math.round(release * 1000);
     document.getElementById("releaseReadout").textContent = Math.round(release * 1000) + "ms";
     document.getElementById("loopToggle").checked = looping;
+    document.getElementById("filterEnable").checked = filterEnabled;
+    document.getElementById("filterType").value = filterType;
+    document.getElementById("filterFreqSlider").value = Math.round(filterFreq);
+    document.getElementById("filterFreqReadout").textContent = Math.round(filterFreq);
+    document.getElementById("filterQSlider").value = filterQ;
+    document.getElementById("filterQReadout").textContent = filterQ.toFixed(1);
 
     if (state.waves) {
         for (const w of state.waves) {
@@ -2191,6 +2254,7 @@ function deserializeState(state) {
         }
     }
     rebuildBuffer();
+    updateFilter();
 }
 
 function refreshSavedPresetsUI() {
@@ -2243,6 +2307,26 @@ document.getElementById("playBtn").addEventListener("click", noteOn);
 document.getElementById("stopBtn").addEventListener("click", function() { noteOff(false); });
 document.getElementById("clearBtn").addEventListener("click", clearWaveforms);
 document.getElementById("addWaveBtn").addEventListener("click", addRow);
+
+// Filter controls
+document.getElementById("filterEnable").addEventListener("change", function () {
+    filterEnabled = this.checked;
+    updateFilter();
+});
+document.getElementById("filterType").addEventListener("change", function () {
+    filterType = this.value;
+    updateFilter();
+});
+document.getElementById("filterFreqSlider").addEventListener("input", function () {
+    filterFreq = parseFloat(this.value);
+    document.getElementById("filterFreqReadout").textContent = Math.round(filterFreq);
+    updateFilter();
+});
+document.getElementById("filterQSlider").addEventListener("input", function () {
+    filterQ = parseFloat(this.value);
+    document.getElementById("filterQReadout").textContent = filterQ.toFixed(1);
+    updateFilter();
+});
 
 // XY mode toggle
 document.getElementById("xyBtn").addEventListener("click", function () {

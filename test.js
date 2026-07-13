@@ -113,6 +113,12 @@ function createStubEnvironment() {
                         gain: { value: 0.8, setValueAtTime: () => {}, linearRampToValueAtTime: () => {} },
                         connect: () => {}, disconnect: () => {},
                     }),
+                    createBiquadFilter: () => ({
+                        type: 'lowpass',
+                        frequency: { value: 1000, setValueAtTime: () => {}, linearRampToValueAtTime: () => {} },
+                        Q: { value: 1, setValueAtTime: () => {}, linearRampToValueAtTime: () => {} },
+                        connect: () => {}, disconnect: () => {},
+                    }),
                     createBufferSource: () => ({
                         buffer: null, loop: false,
                         connect: () => {}, start: () => {}, stop: () => {},
